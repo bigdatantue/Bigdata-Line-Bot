@@ -5,12 +5,14 @@ from linebot.v3.exceptions import (
 )
 from linebot.v3.webhooks import (
     MessageEvent,
+    FollowEvent,
     TextMessageContent
 )
 from linebot.v3.messaging import (
     ApiClient,
     MessagingApi,
     ReplyMessageRequest,
+    ImageMessage,
     TextMessage
 )
 
@@ -40,6 +42,20 @@ def callback():
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
     return 'OK'
+
+# 處理加入好友事件
+@line_handler.add(FollowEvent)
+def handle_follow(event):
+    # 歡迎訊息
+    welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
+
+    # 圖片訊息
+    image_url = 'https://i.imgur.com/RFQKmop.png'
+
+    # 回覆訊息
+    reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url),
+                          TextMessage(text=welcome_message)])
+
 
 # 處理文字訊息
 @line_handler.add(MessageEvent, message=TextMessageContent)
