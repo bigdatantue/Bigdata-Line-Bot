@@ -1,7 +1,5 @@
+from config import Config
 from flask import Flask, request, abort
-from linebot.v3 import (
-    WebhookHandler
-)
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -10,27 +8,18 @@ from linebot.v3.webhooks import (
     TextMessageContent
 )
 from linebot.v3.messaging import (
-    Configuration,
     ApiClient,
     MessagingApi,
     ReplyMessageRequest,
     TextMessage
 )
-import sys
-import os
 
 app = Flask(__name__)
 
-# LINE 聊天機器人的基本資料
-CHANNEL_SECRET = os.getenv('CHANNEL_SECRET', None)
-CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN', None)
-
-if CHANNEL_SECRET is None or CHANNEL_ACCESS_TOKEN is None:
-    print("Please set LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN environment variables.")
-    sys.exit(1)
-
-configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
-line_handler = WebhookHandler(CHANNEL_SECRET)
+# 初始化 Config
+config = Config()
+configuration = config.configuration
+line_handler = config.handler
 
 # domain root
 @app.route('/')
