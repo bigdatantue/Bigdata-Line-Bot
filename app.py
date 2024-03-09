@@ -22,6 +22,7 @@ app = Flask(__name__)
 config = Config()
 configuration = config.configuration
 line_handler = config.handler
+spreadsheetService = config.spreadsheetService
 
 # domain root
 @app.route('/')
@@ -46,13 +47,16 @@ def callback():
 # 處理加入好友事件
 @line_handler.add(FollowEvent)
 def handle_follow(event):
-    # 歡迎訊息
-    welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
+    # 取得使用者ID
+    user_id = event.source.user_id
+    # 檢查使用者是否存在，若不存在則新增至試算表
+    if not spreadsheetService.check_user_exists(user_id):
+        user_info = get_user_info(user_id)
+        spreadsheetService.add_user(user_id, user_info)
 
-    # 圖片訊息
+    welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
     image_url = 'https://i.imgur.com/RFQKmop.png'
 
-    # 回覆訊息
     reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url),
                           TextMessage(text=welcome_message)])
 
@@ -75,5 +79,16 @@ def reply_message(event, messages):
                 messages=messages
             )
         )
+
+# 取得使用者資訊
+def get_user_info(user_id):
+    """Returns
+    list: [使用者名稱, 使用者大頭貼]
+    """
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
+        user_info = line_bot_api.get_profile(user_id)
+        return [user_info.display_name, user_info.picture_url]
+
 if __name__ == "__main__":
     app.run()
