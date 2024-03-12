@@ -1,4 +1,5 @@
 from config import Config
+from api.linebot_helper import RichMenuHelper
 from flask import Flask, request, abort
 from linebot.v3.exceptions import (
     InvalidSignatureError
@@ -89,6 +90,8 @@ def get_user_info(user_id):
         line_bot_api = MessagingApi(api_client)
         user_info = line_bot_api.get_profile(user_id)
         return [user_info.display_name, user_info.picture_url]
+
+RichMenuHelper.create_rich_menu()
 
 if __name__ == "__main__":
     app.run()
