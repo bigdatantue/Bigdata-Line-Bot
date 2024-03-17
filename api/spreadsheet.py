@@ -43,7 +43,7 @@ class SpreadsheetService:
         """
         wks = self.sh.worksheet_by_title('user_status')
         user_row_index = self.get_user_row_index(wks, user_id)
-        column_index = self.get_column_index(wks, 'current_state')
+        column_index = self.get_column_index(wks, 'status')
         return wks.get_value((user_row_index, column_index))
     
     def set_user_status(self, user_id, state):
@@ -52,5 +52,14 @@ class SpreadsheetService:
         """
         wks = self.sh.worksheet_by_title('user_status')
         user_row_index = self.get_user_row_index(wks, user_id)
-        column_index = self.get_column_index(wks, 'current_state')
+        column_index = self.get_column_index(wks, 'status')
         wks.update_value((user_row_index, column_index), state)
+        
+    def set_user_is_active(self, user_id, is_active):
+        """
+        設定使用者的is_active
+        """
+        wks = self.sh.worksheet_by_title('user_info')
+        user_row_index = self.get_user_row_index(wks, user_id)
+        column_index = self.get_column_index(wks, 'is_active')
+        wks.update_value((user_row_index, column_index), is_active)
