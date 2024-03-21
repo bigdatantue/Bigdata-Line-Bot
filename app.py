@@ -7,7 +7,8 @@ from linebot.v3.exceptions import (
 from linebot.v3.webhooks import (
     MessageEvent,
     FollowEvent,
-    TextMessageContent
+    TextMessageContent,
+    UnfollowEvent
 )
 from linebot.v3.messaging import (
     ApiClient,
@@ -54,13 +55,23 @@ def handle_follow(event):
     if not spreadsheetService.check_user_exists(user_id):
         user_info = get_user_info(user_id)
         spreadsheetService.add_user(user_id, user_info)
+        
+    #使用者在試算表的好友狀態設為True
+    spreadsheetService.set_user_is_active(user_id, True)
 
     welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
     image_url = 'https://i.imgur.com/RFQKmop.png'
 
     reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url),
                           TextMessage(text=welcome_message)])
-
+    
+# 記錄使用者加入官方帳號好友後封鎖或刪除好友
+@line_handler.add(UnfollowEvent)
+def handle_unfollow(event):
+    user_id = event.source.user_id
+    
+    #使用者在試算表的好友狀態設為False
+    spreadsheetService.set_user_is_active(user_id, False)
 
 # 處理文字訊息
 @line_handler.add(MessageEvent, message=TextMessageContent)
