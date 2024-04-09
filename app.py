@@ -1,19 +1,18 @@
 from config import Config
-from api.linebot_helper import RichMenuHelper
+from strategy import TaskStrategy, TemplateStrategy
+from api.linebot_helper import LineBotHelper, RichMenuHelper
 from flask import Flask, request, abort
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
 from linebot.v3.webhooks import (
     MessageEvent,
+    PostbackEvent,
     FollowEvent,
-    TextMessageContent,
-    UnfollowEvent
+    UnfollowEvent,
+    TextMessageContent
 )
 from linebot.v3.messaging import (
-    ApiClient,
-    MessagingApi,
-    ReplyMessageRequest,
     ImageMessage,
     TextMessage
 )
@@ -46,62 +45,81 @@ def callback():
         abort(400)
     return 'OK'
 
-# 處理加入好友事件
 @line_handler.add(FollowEvent)
 def handle_follow(event):
+    """
+    Handle加入好友事件
+    """
     # 取得使用者ID
     user_id = event.source.user_id
     # 檢查使用者是否存在，若不存在則新增至試算表
     if not spreadsheetService.check_user_exists(user_id):
-        user_info = get_user_info(user_id)
-        spreadsheetService.add_user(user_id, user_info)
+        user_info = LineBotHelper.get_user_info(user_id)
+        user_info.insert(0, user_id)
+        spreadsheetService.add_user(user_info)
         
     #使用者在試算表的好友狀態設為True
-    spreadsheetService.set_user_is_active(user_id, True)
+    spreadsheetService.set_user_status(user_id, True)
 
     welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
     image_url = 'https://i.imgur.com/RFQKmop.png'
 
-    reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url),
-                          TextMessage(text=welcome_message)])
+    messages = [
+        ImageMessage(original_content_url=image_url, preview_image_url=image_url),
+        TextMessage(text=welcome_message)
+    ]
+    LineBotHelper.reply_message(event, messages)
     
-# 記錄使用者加入官方帳號好友後封鎖或刪除好友
 @line_handler.add(UnfollowEvent)
 def handle_unfollow(event):
+    """
+    Handle使用者封鎖或刪除好友事件
+    """
     user_id = event.source.user_id
     
     #使用者在試算表的好友狀態設為False
-    spreadsheetService.set_user_is_active(user_id, False)
+    spreadsheetService.set_user_status(user_id, False)
 
-# 處理文字訊息
 @line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
+    """
+    Handle文字訊息事件
+    """
     # 取得使用者文字訊息
     user_msg = event.message.text
-    reply_message(event, [TextMessage(text=user_msg)])
+
+    # 動態選擇Template Strategy
+    strategy = TemplateStrategy('message', user_msg)
+    strategy_class = strategy.strategy_action()
+    if strategy_class:
+        task = strategy_class()
+        task.execute(event)
+        return
 
 
-# 回覆多則訊息
-def reply_message(event, messages):
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        line_bot_api.reply_message_with_http_info(
-            ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=messages
-            )
-        )
-
-# 取得使用者資訊
-def get_user_info(user_id):
-    """Returns
-    list: [使用者名稱, 使用者大頭貼]
+@line_handler.add(PostbackEvent)
+def handle_postback(event):
     """
-    with ApiClient(configuration) as api_client:
-        line_bot_api = MessagingApi(api_client)
-        user_info = line_bot_api.get_profile(user_id)
-        return [user_info.display_name, user_info.picture_url]
+    Handle Postback事件
+    """
+    postback_data = event.postback.data
+    params = {}
+    if '=' in postback_data:
+        # 重新拆解Postback Data的參數
+        for param in postback_data.split('&'):
+            key, value = param.split('=')
+            params[key] = value
+    
+    # 動態選擇Task Strategy
+    strategy = TaskStrategy('postback', params)
+    strategy_class = strategy.strategy_action()
+    if strategy_class:
+        task = strategy_class()
+        task.execute(event, params)
+        return
+      
 
+# 初始化 Rich Menu
 RichMenuHelper.create_rich_menu()
 
 if __name__ == "__main__":
