@@ -29,6 +29,9 @@ class DatabaseDocumentMap:
         "course": {
             "carousel": "tGSG2ubenRbo7jPB3Uy4",
             "detail": "WLMwWm4x5fxaErVmFKeH"
+        },
+        "certificate": {
+            "carousel": "M3SylLgx9hHH7vSrPNuu",
         }
     }
     QUICK_REPLY = {
