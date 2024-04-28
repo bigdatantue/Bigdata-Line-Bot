@@ -7,7 +7,8 @@ class TemplateStrategy:
         self.val = val
         self.template_map = {
             '開課時間查詢': 'course',
-            '證書申請流程': 'certificate'
+            '證書申請流程': 'certificate',
+            '社群學習資源': 'community',
         }
 
     def strategy_action(self):

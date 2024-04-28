@@ -24,6 +24,7 @@ class TaskFactory:
     def __init__(self):
         self.task_map = {
             'course': Course,
+            'community': Communtity,
         }
 
     def get_task(self, task_name):
@@ -111,3 +112,18 @@ class Course(Task):
         elif year and semester:
             merged_data = merged_data[(merged_data['year'] == year) & (merged_data['semester'] == semester)]
         return merged_data.to_dict(orient='records')
+    
+class Communtity(Task):
+    """
+    社群學習資源
+    """
+    def execute(self, event, params):
+        microcourses = spreadsheetService.get_worksheet_data('microcourses')
+        line_flex_template = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("community").get("microcourse")
+        ).get('flex')
+        line_flex_json = FlexMessageHelper.create_carousel_bubbles(microcourses, json.loads(line_flex_template), FlexParamMap.COMMUNITY)
+        line_flex_str = json.dumps(line_flex_json)
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])
+        return

@@ -20,7 +20,8 @@ class TemplateFactory:
     def __init__(self):
         self.template_map = {
             'course': Course,
-            'certificate': Certificate
+            'certificate': Certificate,
+            'community': Communtity,
         }
 
     def get_template(self, task_name):
@@ -45,4 +46,12 @@ class Certificate(Template):
     """
     def execute(self, event):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("certificate").get("carousel")).get('flex')
-        LineBotHelper.reply_message(event, [FlexMessage(alt_text='證書申請流程', contents=FlexContainer.from_json(line_flex_str))])    
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='證書申請流程', contents=FlexContainer.from_json(line_flex_str))])
+
+class Communtity(Template):
+    """
+    社群學習資源
+    """
+    def execute(self, event):
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("community").get("carousel")).get('flex')
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])

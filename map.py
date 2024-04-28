@@ -3,7 +3,7 @@ class Map:
     其他Map
     """
     COURSE = {
-        'overview': '總攬',
+        'overview': '總覽',
         'basic': '基礎',
         'advanced': '進階',
         'practical': '實務'
@@ -32,6 +32,10 @@ class DatabaseDocumentMap:
         },
         "certificate": {
             "carousel": "M3SylLgx9hHH7vSrPNuu",
+        },
+        "community": {
+            "carousel": "m4d0AbQPWK2t5AlSTbl0",
+            "microcourse": "by8eewOekAKTjl7gu4OH"
         }
     }
     QUICK_REPLY = {
@@ -58,4 +62,11 @@ class FlexParamMap:
         'credit': 'credit',
         'class': 'class',
         'postback_data': lambda item: f"task=course&course_record={item.get('id')}"
+    }
+
+    COMMUNITY = {
+        'cover_url': 'cover_url',
+        'course_name': 'course_name',
+        'course_desc': 'course_desc',
+        'list_url': 'list_url',
     }
