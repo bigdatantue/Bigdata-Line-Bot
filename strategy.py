@@ -9,6 +9,7 @@ class TemplateStrategy:
             '開課時間查詢': 'course',
             '證書申請流程': 'certificate',
             '社群學習資源': 'community',
+            '線上輔導+實體預約': 'counseling',
         }
 
     def strategy_action(self):
