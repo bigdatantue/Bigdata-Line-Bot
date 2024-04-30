@@ -3,6 +3,7 @@ from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
+    ImageMessage,
     FlexMessage,
     FlexContainer
 )
@@ -25,6 +26,7 @@ class TaskFactory:
         self.task_map = {
             'course': Course,
             'community': Communtity,
+            'certificate': Certificate,
         }
 
     def get_task(self, task_name):
@@ -127,3 +129,14 @@ class Communtity(Task):
         line_flex_str = json.dumps(line_flex_json)
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])
         return
+    
+class Certificate(Task):
+    """
+    證書查詢
+    """
+    def execute(self, event, params):
+        type = params.get('type')
+        if type == 'process':
+            image_url = 'https://bigdatalinebot.blob.core.windows.net/linebot/Micro-Credit-Course-Apply-Process.png'
+            LineBotHelper.reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url)])
+            return
