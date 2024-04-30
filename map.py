@@ -36,6 +36,11 @@ class DatabaseDocumentMap:
         "community": {
             "carousel": "m4d0AbQPWK2t5AlSTbl0",
             "microcourse": "by8eewOekAKTjl7gu4OH"
+        },
+        "counseling": {
+            "select": "waLYz91Ia1z8TKrhkGSZ",
+            "online": "xNzv8OupG7Ph4ujJ8hrp",
+            "physical": "QZogxSAeeA4SooowIwTO"
         }
     }
     QUICK_REPLY = {
