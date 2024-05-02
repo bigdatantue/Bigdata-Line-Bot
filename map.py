@@ -8,6 +8,15 @@ class Map:
         'advanced': '進階',
         'practical': '實務'
     }
+    EQUIPMENT_TYPES = {
+        '1': '小栗方 AI 學習機',
+        '2': 'VIA Pixetto 視覺感測器',
+        '3': 'ALK950 邊緣運算推論器'
+    }
+    EQUIPMENT_STATUS = {
+        'available': 1,
+        'lend': 2
+    }
 
 class DatabaseCollectionMap:
     """
@@ -16,6 +25,7 @@ class DatabaseCollectionMap:
     RICH_MENU = "rich_menu"
     LINE_FLEX = "line_flex"
     QUICK_REPLY = "quick_reply"
+    TEMP = "temp"
 
 class DatabaseDocumentMap:
     """
@@ -41,12 +51,21 @@ class DatabaseDocumentMap:
             "select": "waLYz91Ia1z8TKrhkGSZ",
             "online": "xNzv8OupG7Ph4ujJ8hrp",
             "physical": "QZogxSAeeA4SooowIwTO"
+        },
+        "equipment": {
+            "carousel": "1Q2N5tLGQsW0PLuaRfyk",
+            "borrow": "Yua6r0nL1lSHEB3qIJTP",
+            "search": "eWdGFYXpKeScIDKQIOkc",
+            "confirm": "eA6KrG2kgkvz6U7IghFo"
         }
     }
     QUICK_REPLY = {
         "course": {
             "semester": "0ZKS1zEG8aNb5GfsBQ6e",
             "category": "svGO9YamzyGwjHXZPMpS"
+        },
+        "equipment": {
+            "amount": "ULjCDTW63ie3yxA1462z"
         }
     }
 
@@ -74,4 +93,18 @@ class FlexParamMap:
         'course_name': 'course_name',
         'course_desc': 'course_desc',
         'list_url': 'list_url',
+    }
+
+    EQUIPMENT = {
+        'cover_url': 'cover_url',
+        'equipment_name': 'equipment_name',
+        'total_amount': 'total_amount',
+        'lend_amount': 'lend_amount',
+        'available_amount': 'available_amount',
+        'equipment_id': 'equipment_id',
+        'id': 'id',
+        'amount': 'amount',
+        'start_date': 'start_date',
+        'end_date': 'end_date',
+        'return_time': 'return_time'
     }

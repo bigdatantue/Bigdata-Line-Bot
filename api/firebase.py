@@ -8,6 +8,11 @@ class FireBaseService:
         firebase_admin.initialize_app(self.cred)
         self.db = firestore.client()
 
+    def get_collection_data(self, collection):
+        """取得集合所有資料"""
+        docs = self.db.collection(collection).stream()
+        return [doc.to_dict() for doc in docs]
+
     def get_data(self, collection, doc_id):
         """取得資料"""
         doc_ref = self.db.collection(collection).document(doc_id)
