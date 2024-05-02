@@ -23,6 +23,7 @@ class TemplateFactory:
             'certificate': Certificate,
             'community': Communtity,
             'counseling': Counseling,
+            'equipment': Equipment
         }
 
     def get_template(self, task_name):
@@ -64,3 +65,11 @@ class Counseling(Template):
     def execute(self, event):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("counseling").get("select")).get('flex')
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='線上輔導+實體預約', contents=FlexContainer.from_json(line_flex_str))])
+
+class Equipment(Template):
+    """
+    設備租借
+    """
+    def execute(self, event):
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("equipment").get("carousel")).get('flex')
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_str))])

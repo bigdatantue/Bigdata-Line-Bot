@@ -18,6 +18,7 @@ from linebot.v3.messaging import (
     QuickReply,
     QuickReplyItem
 )
+import random
 import json
 import re
 
@@ -49,6 +50,14 @@ class LineBotHelper:
                     messages=messages
                 )
             )
+    
+    @staticmethod
+    def generate_id(k: int=20):
+        """
+        生成ID
+        """
+        CHARS='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+        return ''.join(random.choices(CHARS, k=k))
 
     @staticmethod
     def map_params(item: dict, map: dict):
@@ -70,7 +79,7 @@ class LineBotHelper:
         """
         def replace(match):
             key = match.group(1)
-            return variable_dict.get(key, match.group(0))
+            return str(variable_dict.get(key, match.group(0)))
 
         # 匹配 {{variable}} 的正規表達式
         pattern = r'\{\{([a-zA-Z0-9_]*)\}\}'

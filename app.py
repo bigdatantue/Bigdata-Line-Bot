@@ -24,6 +24,7 @@ config = Config()
 configuration = config.configuration
 line_handler = config.handler
 spreadsheetService = config.spreadsheetService
+firebaseService = config.firebaseService
 
 # domain root
 @app.route('/')
@@ -87,14 +88,24 @@ def handle_message(event):
     """
     # 取得使用者文字訊息
     user_msg = event.message.text
-
-    # 動態選擇Template Strategy
-    strategy = TemplateStrategy('message', user_msg)
-    strategy_class = strategy.strategy_action()
-    if strategy_class:
-        task = strategy_class()
-        task.execute(event)
-        return
+    user_id = event.source.user_id
+    temp = firebaseService.get_data('temp', user_id)
+    if temp:
+        # 動態選擇Task Strategy(功能中需要使用者輸入文字)
+        strategy = TaskStrategy('message', temp.get('task'))
+        strategy_class = strategy.strategy_action()
+        if strategy_class:
+            task = strategy_class()
+            task.execute(event, {'user_msg': user_msg})
+            return
+    else:
+        # 動態選擇Template Strategy(第一次輸入功能文字)
+        strategy = TemplateStrategy('message', user_msg)
+        strategy_class = strategy.strategy_action()
+        if strategy_class:
+            task = strategy_class()
+            task.execute(event)
+            return
 
 
 @line_handler.add(PostbackEvent)
@@ -103,7 +114,9 @@ def handle_postback(event):
     Handle Postback事件
     """
     postback_data = event.postback.data
-    params = {}
+    # 如果有datetimpicker的參數，才會有postback_params
+    postback_params = event.postback.params
+    params = postback_params if postback_params else {}
     if '=' in postback_data:
         # 重新拆解Postback Data的參數
         for param in postback_data.split('&'):

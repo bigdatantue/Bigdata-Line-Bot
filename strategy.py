@@ -10,6 +10,7 @@ class TemplateStrategy:
             '證書申請流程': 'certificate',
             '社群學習資源': 'community',
             '線上輔導+實體預約': 'counseling',
+            '設備租借': 'equipment'
         }
 
     def strategy_action(self):

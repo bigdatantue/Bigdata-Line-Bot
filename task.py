@@ -10,6 +10,8 @@ from linebot.v3.messaging import (
 from abc import ABC, abstractmethod
 import json
 import pandas as pd
+from datetime import datetime
+import re
 
 config = Config()
 spreadsheetService = config.spreadsheetService
@@ -28,6 +30,7 @@ class TaskFactory:
             'community': Communtity,
             'certificate': Certificate,
             'counseling': Counseling,
+            'equipment': Equipment
         }
 
     def get_task(self, task_name):
@@ -162,3 +165,216 @@ class Counseling(Task):
             ).get('flex')
             LineBotHelper.reply_message(event, [FlexMessage(alt_text='實體預約', contents=FlexContainer.from_json(line_flex_str))])
             return
+        
+class Equipment(Task):
+    """
+    設備租借
+    """
+    def execute(self, event, params):
+        user_id = event.source.user_id
+        user_msg = params.get('user_msg')
+        if user_msg:
+            # 如果有使用者輸入文字，則進入填寫借用人資料流程
+            borrower_info = firebaseService.get_data(DatabaseCollectionMap.TEMP, user_id)
+            prompts = ['請輸入系級', '請輸入email', '請輸入手機號碼', '設備租借成功']
+            keys = ['name', 'department', 'email', 'phone']
+            for key, prompt in zip(keys, prompts):
+                if key not in borrower_info['borrowerData']:
+                    if key == 'email' and not __class__.__check_email(user_msg):
+                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入正確的email格式')])
+                    elif key == 'phone' and not __class__.__check_phone(user_msg):
+                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入正確的手機號碼格式')])
+                    borrower_info['borrowerData'][key] = user_msg
+                    firebaseService.update_data(DatabaseCollectionMap.TEMP, user_id, borrower_info)
+                    if key == 'phone':
+                        # 最後一個資料輸入完畢，進行設備租借
+                        borrower_id = __class__.__rent_equipment(borrower_info)
+                        firebaseService.delete_data(DatabaseCollectionMap.TEMP, user_id)
+                        borrow_records = __class__.__get_borrow_records(user_id, borrower_id)
+                        line_flex_template = firebaseService.get_data(
+                        DatabaseCollectionMap.LINE_FLEX,
+                            DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
+                        ).get('flex')
+                        line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                        line_flex_str = json.dumps(line_flex_json)
+                        return LineBotHelper.reply_message(event, [
+                            TextMessage(text=prompt),
+                            FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))
+                        ])
+                    return LineBotHelper.reply_message(event, [TextMessage(text=prompt)])
+        else:
+            type = params.get('type')
+            if type == 'borrow':
+                equipment_id = params.get('equipment_id')
+                amount = params.get('amount')
+                confirmed = params.get('status') == 'confirm'
+                if confirmed:
+                    # 送出租借資訊
+                    start_date = params.get('start_date')
+                    pickup_time = params.get('pickup_time')
+                    end_date = params.get('end_date')
+                    return_time = params.get('return_time')
+                    data = {
+                        'task': 'equipment',
+                        'equipment_id': equipment_id,
+                        'amount': params.get('amount'),
+                        'startDate': start_date,
+                        'selectedTime': pickup_time,
+                        'endDate': end_date,
+                        'returnTime': return_time,
+                        'borrower': user_id,
+                        'borrowerData': {}
+                    }
+                    is_valid, error_msg = __class__.__check_borrow_data(start_date.replace(' ',''), pickup_time.replace(' ',''), end_date.replace(' ',''), return_time.replace(' ',''))
+                    if is_valid:
+                        firebaseService.add_data(DatabaseCollectionMap.TEMP, user_id, data)
+                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入借用人姓名')])
+                    else:
+                        return LineBotHelper.reply_message(event, [TextMessage(text=error_msg)])
+                elif amount:
+                    # 編輯租借資訊
+                    item = params.get('item')
+                    line_flex_template = firebaseService.get_data(
+                        DatabaseCollectionMap.LINE_FLEX,
+                        DatabaseDocumentMap.LINE_FLEX.get("equipment").get("confirm")
+                    ).get('flex')
+                    items = {
+                        'equipment_id': equipment_id,
+                        'equipment_name': Map.EQUIPMENT_TYPES.get(equipment_id),
+                        'amount': amount,
+                        'start_date': params.get('start_date', ' '),
+                        'pickup_time': params.get('pickup_time', ' '),
+                        'end_date': params.get('end_date', ' '),
+                        'return_time': params.get('return_time', ' ')
+                    }
+                    # 重新設定使用者修改的欄位
+                    items[item] = params.get('date') if item == 'start_date' or item == 'end_date' else params.get('time')
+                    
+                    line_flex_str = LineBotHelper.replace_variable(line_flex_template, items)
+                    return LineBotHelper.reply_message(event, [FlexMessage(alt_text='確認租借', contents=FlexContainer.from_json(line_flex_str))])
+                elif equipment_id:
+                    # 選擇租借數量
+                    quick_reply_data = firebaseService.get_data(
+                        DatabaseCollectionMap.QUICK_REPLY,
+                        DatabaseDocumentMap.QUICK_REPLY.get("equipment").get("amount")
+                    )
+                    for i, text in enumerate(quick_reply_data.get('actions')):
+                        quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
+                    return LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
+                else:
+                    # 選擇租借設備
+                    equipments = spreadsheetService.get_worksheet_data('equipments')
+                    equipment_status_data = firebaseService.get_collection_data('equipments')
+
+                    # 計算設備總數、已借出數、可借出數
+                    for i in range(len(equipments)):
+                        total_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id')])
+                        lend_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id') and equipment.get('status') == Map.EQUIPMENT_STATUS.get('lend')])
+                        equipments[i]['total_amount'] = total_amount
+                        equipments[i]['lend_amount'] = lend_amount
+                        equipments[i]['available_amount'] = total_amount - lend_amount
+
+                    line_flex_template = firebaseService.get_data(
+                        DatabaseCollectionMap.LINE_FLEX,
+                        DatabaseDocumentMap.LINE_FLEX.get("equipment").get("borrow")
+                    ).get('flex')
+                    line_flex_template = FlexMessageHelper.create_carousel_bubbles(equipments, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                    line_flex_template = json.dumps(line_flex_template)
+                    return LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_template))])
+            else:
+                # 查詢借用清單
+                borrow_records = __class__.__get_borrow_records(user_id)
+                if len(borrow_records) == 0:
+                    LineBotHelper.reply_message(event, [TextMessage(text='您目前沒有借用任何設備')])
+                    return
+                line_flex_template = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
+                ).get('flex')
+                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                line_flex_str = json.dumps(line_flex_json)
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __check_borrow_data(start_date, pickup_time, end_date, return_time):
+        """Returns
+        Tuple[bool, str]: 是否合法, 錯誤訊息
+        """
+        if start_date and pickup_time and end_date and return_time:
+            # 檢查借用結束日期是否大於借用開始日期
+            start_datetime = datetime.strptime(f'{start_date} {pickup_time}', '%Y-%m-%d %H:%M')
+            end_datetime = datetime.strptime(f'{end_date} {return_time}', '%Y-%m-%d %H:%M')
+            if start_datetime >= end_datetime:
+                return False, '借用結束日期時間需大於借用開始日期時間'
+            else:
+                return True, ''
+        else:
+            return False, '請填寫完整借用資訊'
+
+    def __check_email(email: str):
+        """Returns
+        bool: email格式是否合法
+        """
+        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+        return re.fullmatch(regex, email)
+    
+    def __check_phone(phone: str):
+        """Returns 
+        bool: 手機號碼格式是否合法
+        """
+        regex = r'^09\d{8}$'
+        return re.fullmatch(regex, phone)
+    
+    def __rent_equipment(params: dict):
+        """租借設備(更新資料庫)
+        Returns
+        str: 借用者id
+        """
+        equipment_status_data = firebaseService.get_collection_data('equipments')
+        # 取得可借出的設備
+        equipment_status_data = [equipment for equipment in equipment_status_data if str(equipment.get('type')) == params.get('equipment_id') and equipment.get('status') == Map.EQUIPMENT_STATUS.get('available')]
+        # 隨機產生id
+        borrower_id = LineBotHelper.generate_id()
+        # 更新設備狀態
+        for equipment in equipment_status_data[:int(params.get('amount'))]:
+            equipment['borrowerId'] = borrower_id
+            equipment['borrower'] = params.get('borrower')
+            equipment['status'] = Map.EQUIPMENT_STATUS.get('lend')
+            equipment['startDate'] = params.get('startDate')
+            equipment['selectedTime'] = params.get('selectedTime')
+            equipment['endDate'] = params.get('endDate')
+            equipment['returnTime'] = params.get('returnTime')
+            equipment['borrowerData'] = params.get('borrowerData')
+            firebaseService.update_data('equipments', equipment.get('_id'), equipment)
+        return borrower_id
+    
+    def __get_borrow_records(user_id: str, borrower_id: str=None):
+        """Returns
+        list: 借用紀錄
+        """
+        equipments = firebaseService.get_collection_data('equipments')
+        
+        borrow_records_dict = {}
+        for equipment in equipments:
+            # 前者為該使用者借用的所有設備，後者為該使用者借用且為borrower_id的設備
+            if (not borrower_id and equipment.get('borrower') == user_id) or (borrower_id and equipment.get('borrower') == user_id and equipment.get('borrowerId') == borrower_id):
+                # borrower_id_ 多一個底線是為了避免與參數名稱衝突
+                borrower_id_ = equipment.get('borrowerId')
+                if borrower_id_ not in borrow_records_dict:
+                    borrow_records_dict[borrower_id_] = {
+                        'amount': 0,
+                        'equipment_name': equipment.get('name'),
+                        'start_date': equipment.get('startDate'),
+                        'end_date': equipment.get('endDate'),
+                        'return_time': equipment.get('returnTime'),
+                        'id': []
+                    }
+                borrow_records_dict[borrower_id_]['amount'] += 1
+                borrow_records_dict[borrower_id_]['id'].append(equipment.get('_id'))
+
+        # 將借用紀錄整理成list(不需要borrower_id_這個key了，只把需要的資料取出來)
+        borrow_records = []
+        for borrower_id, record in borrow_records_dict.items():
+            record['id'] = '\\n'.join(record['id'])
+            borrow_records.append(record)
+
+        return borrow_records
