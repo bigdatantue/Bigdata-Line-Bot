@@ -18,6 +18,7 @@ from linebot.v3.messaging import (
     QuickReply,
     QuickReplyItem
 )
+import requests
 import random
 import json
 import re
@@ -130,18 +131,21 @@ class RichMenuHelper:
             size=RichMenuSize(width=rich_menu['size']['width'], height=rich_menu['size']['height']),
             selected=rich_menu['selected'],
             name=rich_menu['name'],
-            chat_bar_text=rich_menu['name'],
+            chat_bar_text=rich_menu['chatBarText'],
             areas=areas
         )
     
-    def set_rich_menu_image(line_bot_blob_api, rich_menu_id, image_path):
+    def set_rich_menu_image(line_bot_blob_api, rich_menu_id, image_url):
         """
         設定圖文選單的圖片
         """
-        with open(image_path, 'rb') as image:
+        response = requests.get(image_url)
+        if response.status_code != 200:
+            raise ValueError('Invalid image url')
+        else:
             line_bot_blob_api.set_rich_menu_image(
                 rich_menu_id=rich_menu_id,
-                body=bytearray(image.read()),
+                body=response.content,
                 _headers={'Content-Type': 'image/png'}
             )
     
@@ -170,29 +174,31 @@ class RichMenuHelper:
             line_bot_blob_api = MessagingApiBlob(api_client)
 
             # 圖文選單 A
-            rich_menu_a = firebaseService.get_data(
+            rich_menu_a_data = firebaseService.get_data(
                 DatabaseCollectionMap.RICH_MENU,
                 DatabaseDocumentMap.RICH_MENU.get('a')
-            ).get('richmenu')
-            rich_menu_a = json.loads(rich_menu_a)
+            )
+            rich_menu_a = json.loads(rich_menu_a_data.get('richmenu'))
             rich_menu_a_to_create = __class__.create_rich_menu_request(rich_menu_a, __class__.create_rich_menu_areas(rich_menu_a))
 
             rich_menu_a_id = line_bot_api.create_rich_menu(rich_menu_request=rich_menu_a_to_create).rich_menu_id
-            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_a_id, 'src/images/richmenu1.png')
-            __class__.create_rich_menu_alias(line_bot_api, 'richmenu-alias-a', rich_menu_a_id)
+            rich_menu_a_url = rich_menu_a_data.get('image_url')
+            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_a_id, rich_menu_a_url)
+            __class__.create_rich_menu_alias(line_bot_api, 'page1', rich_menu_a_id)
 
             line_bot_api.set_default_rich_menu(rich_menu_a_id)
 
             # 圖文選單 B
-            rich_menu_b = firebaseService.get_data(
+            rich_menu_b_data = firebaseService.get_data(
                 DatabaseCollectionMap.RICH_MENU,
                 DatabaseDocumentMap.RICH_MENU.get("b")
-            ).get('richmenu')
-            rich_menu_b = json.loads(rich_menu_b)
+            )
+            rich_menu_b = json.loads(rich_menu_b_data.get('richmenu'))
             rich_menu_b_to_create = __class__.create_rich_menu_request(rich_menu_b, __class__.create_rich_menu_areas(rich_menu_b))
             rich_menu_b_id = line_bot_api.create_rich_menu(rich_menu_request=rich_menu_b_to_create).rich_menu_id
-            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_b_id, 'src/images/richmenu2.png')
-            __class__.create_rich_menu_alias(line_bot_api, 'richmenu-alias-b', rich_menu_b_id)
+            rich_menu_b_url = rich_menu_b_data.get('image_url')
+            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_b_id, rich_menu_b_url)
+            __class__.create_rich_menu_alias(line_bot_api, 'page2', rich_menu_b_id)
 
 class QuickReplyHelper:
     @staticmethod
