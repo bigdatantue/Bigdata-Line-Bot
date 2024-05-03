@@ -32,8 +32,8 @@ class DatabaseDocumentMap:
     Map資料庫Document名稱
     """
     RICH_MENU = {
-        "a": "1LStCWmV4rBBDNGknB62",
-        "b": "jUa6Z0Fk7OMwFtDzmoyd"
+        "a": "page1",
+        "b": "page2"
     }
     LINE_FLEX = {
         "course": {
