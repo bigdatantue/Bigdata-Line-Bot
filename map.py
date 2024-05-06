@@ -1,7 +1,40 @@
+from enum import Enum, IntEnum
+
+class FeatureStatus(Enum):
+    """
+    功能狀態
+    """
+    # 啟用
+    ENABLE = 1
+    # 維護
+    MAINTENANCE = 2
+    # 未開放
+    DISABLE = 3
+
+class EquipmentStatus(IntEnum):
+    """
+    設備狀態
+    """
+    # 可借用
+    AVAILABLE = 1
+    # 已借出
+    LEND = 2
+
 class Map:
     """
     其他Map
     """
+    FEATURE = {
+        '主選單': 'menu',
+        '設定': 'setting',
+        '常見問答': 'faq',
+        '開課時間查詢': 'course',
+        '證書申請流程': 'certificate',
+        '社群學習資源': 'community',
+        '線上輔導+實體預約': 'counseling',
+        '設備租借': 'equipment',
+        '計畫成果展示': 'gallery'
+    }
     COURSE = {
         'overview': '總覽',
         'basic': '基礎',
@@ -36,6 +69,9 @@ class DatabaseDocumentMap:
         "b": "page2"
     }
     LINE_FLEX = {
+        "menu": {
+            "main": "ltWn6U09IULOHB6rpfyP"
+        },
         "course": {
             "carousel": "tGSG2ubenRbo7jPB3Uy4",
             "detail": "WLMwWm4x5fxaErVmFKeH"

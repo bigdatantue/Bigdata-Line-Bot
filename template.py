@@ -19,6 +19,7 @@ class Template(ABC):
 class TemplateFactory:
     def __init__(self):
         self.template_map = {
+            'menu': Menu,
             'course': Course,
             'certificate': Certificate,
             'community': Communtity,
@@ -34,6 +35,14 @@ class TemplateFactory:
             print("找不到對應的模板")
             return None
 
+class Menu(Template):
+    """
+    主選單
+    """
+    def execute(self, event):
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("menu").get("main")).get('flex')
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='主選單', contents=FlexContainer.from_json(line_flex_str))])
+        
 class Course(Template):
     """
     開課時間查詢

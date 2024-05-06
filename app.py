@@ -1,5 +1,6 @@
 from config import Config
 from strategy import TaskStrategy, TemplateStrategy
+from map import Map, FeatureStatus
 from api.linebot_helper import LineBotHelper, RichMenuHelper
 from flask import Flask, request, abort
 from linebot.v3.exceptions import (
@@ -89,22 +90,34 @@ def handle_message(event):
     # 取得使用者文字訊息
     user_msg = event.message.text
     user_id = event.source.user_id
+    feature = Map.FEATURE.get(user_msg)    
     temp = firebaseService.get_data('temp', user_id)
-    if temp:
+
+    # 判斷使用者輸入的文字是否為功能
+    if feature:
+        # 如果使用者跳出上個功能，則刪除暫存資料
+        if temp:
+            firebaseService.delete_data('temp', user_id)
+        feature_status = config.feature.get(feature)
+        if feature_status == FeatureStatus.DISABLE:
+            return LineBotHelper.reply_message(event, [TextMessage(text='此功能尚未開放，敬請期待！')])
+        elif feature_status == FeatureStatus.MAINTENANCE:
+            return LineBotHelper.reply_message(event, [TextMessage(text='此功能維護中，請見諒！')])
+        else:
+            # 動態選擇Template Strategy(第一次輸入功能文字)
+            strategy = TemplateStrategy('message', feature)
+            strategy_class = strategy.strategy_action()
+            if strategy_class:
+                task = strategy_class()
+                task.execute(event)
+                return
+    elif temp:
         # 動態選擇Task Strategy(功能中需要使用者輸入文字)
         strategy = TaskStrategy('message', temp.get('task'))
         strategy_class = strategy.strategy_action()
         if strategy_class:
             task = strategy_class()
             task.execute(event, {'user_msg': user_msg})
-            return
-    else:
-        # 動態選擇Template Strategy(第一次輸入功能文字)
-        strategy = TemplateStrategy('message', user_msg)
-        strategy_class = strategy.strategy_action()
-        if strategy_class:
-            task = strategy_class()
-            task.execute(event)
             return
 
 

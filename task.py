@@ -1,5 +1,5 @@
 from config import Config
-from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap
+from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap, EquipmentStatus
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
@@ -269,7 +269,7 @@ class Equipment(Task):
                     # 計算設備總數、已借出數、可借出數
                     for i in range(len(equipments)):
                         total_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id')])
-                        lend_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id') and equipment.get('status') == Map.EQUIPMENT_STATUS.get('lend')])
+                        lend_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id') and equipment.get('status') == EquipmentStatus.LEND])
                         equipments[i]['total_amount'] = total_amount
                         equipments[i]['lend_amount'] = lend_amount
                         equipments[i]['available_amount'] = total_amount - lend_amount
@@ -331,14 +331,14 @@ class Equipment(Task):
         """
         equipment_status_data = firebaseService.get_collection_data('equipments')
         # 取得可借出的設備
-        equipment_status_data = [equipment for equipment in equipment_status_data if str(equipment.get('type')) == params.get('equipment_id') and equipment.get('status') == Map.EQUIPMENT_STATUS.get('available')]
+        equipment_status_data = [equipment for equipment in equipment_status_data if str(equipment.get('type')) == params.get('equipment_id') and equipment.get('status') == EquipmentStatus.AVAILABLE]
         # 隨機產生id
         borrower_id = LineBotHelper.generate_id()
         # 更新設備狀態
         for equipment in equipment_status_data[:int(params.get('amount'))]:
             equipment['borrowerId'] = borrower_id
             equipment['borrower'] = params.get('borrower')
-            equipment['status'] = Map.EQUIPMENT_STATUS.get('lend')
+            equipment['status'] = EquipmentStatus.LEND
             equipment['startDate'] = params.get('startDate')
             equipment['selectedTime'] = params.get('selectedTime')
             equipment['endDate'] = params.get('endDate')
