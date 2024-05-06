@@ -10,6 +10,7 @@ import pygsheets
 import json
 from api.spreadsheet import SpreadsheetService
 from api.firebase import FireBaseService
+from map import FeatureStatus
 
 class Singleton(type):
     _instances = {}
@@ -31,6 +32,7 @@ class Config(metaclass=Singleton):
         self.spreadsheetService = None
         self.firebaseService = None
         self.line_bot_init()
+        self.feature_init()
 
     def check_env(self):
         """確認環境變數是否正確設定"""
@@ -52,3 +54,16 @@ class Config(metaclass=Singleton):
         self.configuration = Configuration(access_token=self.CHANNEL_ACCESS_TOKEN)
         self.spreadsheetService = SpreadsheetService(pygsheets.authorize(service_account_env_var='GDRIVE_API_CREDENTIALS'), self.SPREADSHEET_URL)
         self.firebaseService = FireBaseService(json.loads(self.FIREBASE_CREDENTIALS))
+    
+    def feature_init(self):
+        self.feature = {
+            'menu': FeatureStatus.ENABLE,
+            'setting': FeatureStatus.DISABLE,
+            'faq': FeatureStatus.DISABLE,
+            'course': FeatureStatus.ENABLE,
+            'certificate': FeatureStatus.ENABLE,
+            'community': FeatureStatus.ENABLE,
+            'counseling': FeatureStatus.ENABLE,
+            'equipment': FeatureStatus.ENABLE,
+            'gallery': FeatureStatus.DISABLE
+        }
