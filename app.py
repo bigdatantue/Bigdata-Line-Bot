@@ -1,6 +1,6 @@
 from config import Config
 from strategy import TaskStrategy, TemplateStrategy
-from map import Map, FeatureStatus
+from map import Map, FeatureStatus, Permission
 from api.linebot_helper import LineBotHelper, RichMenuHelper
 from flask import Flask, request, abort
 from linebot.v3.exceptions import (
@@ -58,6 +58,8 @@ def handle_follow(event):
     if not spreadsheetService.check_user_exists(user_id):
         user_info = LineBotHelper.get_user_info(user_id)
         user_info.insert(0, user_id)
+        # 新增一般使用者
+        user_info.append(Permission.USER)
         spreadsheetService.add_user(user_info)
         
     #使用者在試算表的好友狀態設為True
