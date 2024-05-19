@@ -12,6 +12,7 @@ config = Config()
 firebaseService = config.firebaseService
 
 class Template(ABC):
+    PERMISSION = 1
     @abstractmethod
     def execute(self, event):
         pass

@@ -20,6 +20,19 @@ class EquipmentStatus(IntEnum):
     # 已借出
     LEND = 2
 
+class Permission(IntEnum):
+    """
+    權限
+    """
+    # 一般使用者
+    USER = 1
+    # 工作人員
+    STAFF = 2
+    # 工作領導者
+    LEADER = 3
+    # 管理員
+    ADMIN = 4
+
 class Map:
     """
     其他Map
