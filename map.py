@@ -20,6 +20,17 @@ class EquipmentStatus(IntEnum):
     # 已借出
     LEND = 2
 
+class EquipmentType(IntEnum):
+    """
+    設備類型
+    """
+    # 小栗方 AI 學習機
+    AI = 1
+    # VIA Pixetto 視覺感測器
+    VIA = 2
+    # ALK950 邊緣運算推論器
+    ALK = 3
+
 class Permission(IntEnum):
     """
     權限
@@ -54,14 +65,10 @@ class Map:
         'advanced': '進階',
         'practical': '實務'
     }
-    EQUIPMENT_TYPES = {
-        '1': '小栗方 AI 學習機',
-        '2': 'VIA Pixetto 視覺感測器',
-        '3': 'ALK950 邊緣運算推論器'
-    }
-    EQUIPMENT_STATUS = {
-        'available': 1,
-        'lend': 2
+    EQUIPMENT_NAME = {
+        EquipmentType.AI: '小栗方 AI 學習機',
+        EquipmentType.VIA: 'VIA Pixetto 視覺感測器',
+        EquipmentType.ALK: 'ALK950 邊緣運算推論器'
     }
 
 class DatabaseCollectionMap:
@@ -105,7 +112,8 @@ class DatabaseDocumentMap:
             "carousel": "1Q2N5tLGQsW0PLuaRfyk",
             "borrow": "Yua6r0nL1lSHEB3qIJTP",
             "search": "eWdGFYXpKeScIDKQIOkc",
-            "confirm": "eA6KrG2kgkvz6U7IghFo"
+            "confirm": "eA6KrG2kgkvz6U7IghFo",
+            "approve": "YdnF1TBt3tfKbDkpO12t"
         }
     }
     QUICK_REPLY = {

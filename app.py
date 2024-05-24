@@ -58,7 +58,7 @@ def handle_follow(event):
     if not spreadsheetService.check_user_exists(user_id):
         user_info = LineBotHelper.get_user_info(user_id)
         user_info.insert(0, user_id)
-        # 新增一般使用者
+        # 新增一般使用者權限
         user_info.append(Permission.USER)
         spreadsheetService.add_user(user_info)
         
