@@ -6,6 +6,8 @@ from linebot.v3.messaging import (
     MessagingApi,
     MessagingApiBlob,
     ReplyMessageRequest,
+    MulticastRequest,
+    PushMessageRequest,
     RichMenuRequest,
     RichMenuArea,
     RichMenuSize,
@@ -48,6 +50,34 @@ class LineBotHelper:
             line_bot_api.reply_message_with_http_info(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
+                    messages=messages
+                )
+            )
+
+    @staticmethod
+    def multicast_message(user_ids: list, messages: list):
+        """
+        推播多則訊息給多位user
+        """
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.multicast_with_http_info(
+                MulticastRequest(
+                    to=user_ids,
+                    messages=messages
+                )
+            )
+
+    @staticmethod
+    def push_message(user_id: str, messages: list):
+        """
+        推播多則訊息給一位user
+        """
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.push_message_with_http_info(
+                PushMessageRequest(
+                    to=user_id,
                     messages=messages
                 )
             )

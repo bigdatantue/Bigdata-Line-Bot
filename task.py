@@ -1,5 +1,5 @@
 from config import Config
-from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap, EquipmentStatus
+from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap, EquipmentStatus, Permission
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
@@ -173,10 +173,37 @@ class Equipment(Task):
     def execute(self, event, params):
         user_id = event.source.user_id
         user_msg = params.get('user_msg')
+        decision = params.get('decision')
+        if decision:
+            borrower_user_id = params.get('borrower_user_id')
+            borrower_info = firebaseService.get_data(DatabaseCollectionMap.TEMP, borrower_user_id)
+            if not borrower_info:
+                return LineBotHelper.reply_message(event, [TextMessage(text='此租借申請已審核過')])
+            # 使用者回覆設備租借核准
+            if decision == '1':
+                # 設備租借核准
+                borrower_id = __class__.__rent_equipment(borrower_info)
+                firebaseService.delete_data(DatabaseCollectionMap.TEMP, borrower_user_id)
+                borrow_records = __class__.__get_borrow_records(borrower_user_id, borrower_id)
+                line_flex_template = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
+                ).get('flex')
+                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                line_flex_str = json.dumps(line_flex_json)
+                LineBotHelper.reply_message(event, [TextMessage(text='設備租借核准'), FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
+                LineBotHelper.push_message(borrower_user_id, [TextMessage(text='設備租借核准'), FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
+                return
+            else:
+                # 設備租借不核准
+                firebaseService.delete_data(DatabaseCollectionMap.TEMP, borrower_user_id)
+                LineBotHelper.reply_message(event, [TextMessage(text='設備租借不通過')])
+                LineBotHelper.push_message(borrower_user_id, [TextMessage(text='設備租借不通過')])
+                return
         if user_msg:
             # 如果有使用者輸入文字，則進入填寫借用人資料流程
             borrower_info = firebaseService.get_data(DatabaseCollectionMap.TEMP, user_id)
-            prompts = ['請輸入系級', '請輸入email', '請輸入手機號碼', '設備租借成功']
+            prompts = ['請輸入系級', '請輸入email', '請輸入手機號碼', '已送出租借申請']
             keys = ['name', 'department', 'email', 'phone']
             for key, prompt in zip(keys, prompts):
                 if key not in borrower_info['borrowerData']:
@@ -188,19 +215,26 @@ class Equipment(Task):
                     firebaseService.update_data(DatabaseCollectionMap.TEMP, user_id, borrower_info)
                     if key == 'phone':
                         # 最後一個資料輸入完畢，進行設備租借
-                        borrower_id = __class__.__rent_equipment(borrower_info)
-                        firebaseService.delete_data(DatabaseCollectionMap.TEMP, user_id)
-                        borrow_records = __class__.__get_borrow_records(user_id, borrower_id)
-                        line_flex_template = firebaseService.get_data(
-                        DatabaseCollectionMap.LINE_FLEX,
-                            DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
-                        ).get('flex')
-                        line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
-                        line_flex_str = json.dumps(line_flex_json)
-                        return LineBotHelper.reply_message(event, [
-                            TextMessage(text=prompt),
-                            FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))
-                        ])
+                        user_info_data = spreadsheetService.get_worksheet_data('user_info')
+                        user_info_data = [user for user in user_info_data if user.get('permission') >= Permission.LEADER]
+                        user_ids = [user.get('user_id') for user in user_info_data]
+                        line_flex_str = firebaseService.get_data(DatabaseCollectionMap.LINE_FLEX, DatabaseDocumentMap.LINE_FLEX.get("equipment").get("approve")).get('flex')
+                        # return LineBotHelper.reply_message(event, [TextMessage(text=prompt), FlexMessage(alt_text='申請核准', contents=FlexContainer.from_json(line_flex_decision))])
+                        items = {
+                            'equipment_name': Map.EQUIPMENT_NAME.get(int(borrower_info['equipment_id'])),
+                            'borrower_user_id': user_id,
+                            'name': borrower_info['borrowerData']['name'],
+                            'borrower_department': borrower_info['borrowerData']['department'],
+                            'borrower_email': borrower_info['borrowerData']['email'],
+                            'borrower_phone': borrower_info['borrowerData']['phone'],
+                            'amount': borrower_info['amount'],
+                            'start_date': borrower_info['startDate'],
+                            'pickup_time': borrower_info['selectedTime'],
+                            'end_date': borrower_info['endDate'],
+                            'return_time': borrower_info['returnTime']
+                        }
+                        line_flex_str = LineBotHelper.replace_variable(line_flex_str, items)
+                        return LineBotHelper.multicast_message(user_ids, [FlexMessage(alt_text='租借申請確認', contents=FlexContainer.from_json(line_flex_str))])
                     return LineBotHelper.reply_message(event, [TextMessage(text=prompt)])
         else:
             type = params.get('type')
@@ -240,7 +274,7 @@ class Equipment(Task):
                     ).get('flex')
                     items = {
                         'equipment_id': equipment_id,
-                        'equipment_name': Map.EQUIPMENT_TYPES.get(equipment_id),
+                        'equipment_name': Map.EQUIPMENT_NAME.get(int(equipment_id)),
                         'amount': amount,
                         'start_date': params.get('start_date', ' '),
                         'pickup_time': params.get('pickup_time', ' '),
