@@ -41,7 +41,7 @@ class Menu(Template):
     主選單
     """
     def execute(self, event):
-        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("menu").get("main")).get('flex')
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("menu")).get("main")
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='主選單', contents=FlexContainer.from_json(line_flex_str))])
         
 class Course(Template):
@@ -49,7 +49,7 @@ class Course(Template):
     開課時間查詢
     """
     def execute(self, event):
-        quick_reply_data = firebaseService.get_data('quick_reply', DatabaseDocumentMap.QUICK_REPLY.get("course").get("semester"))
+        quick_reply_data = firebaseService.get_data('quick_reply', DatabaseDocumentMap.QUICK_REPLY.get("course")).get("semester")
         LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
 
 class Certificate(Template):
@@ -57,7 +57,7 @@ class Certificate(Template):
     證書申請流程
     """
     def execute(self, event):
-        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("certificate").get("carousel")).get('flex')
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("certificate")).get('summary')
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='證書申請流程', contents=FlexContainer.from_json(line_flex_str))])
 
 class Communtity(Template):
@@ -65,7 +65,7 @@ class Communtity(Template):
     社群學習資源
     """
     def execute(self, event):
-        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("community").get("carousel")).get('flex')
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("community")).get("summary")
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])
 
 class Counseling(Template):
@@ -73,7 +73,7 @@ class Counseling(Template):
     線上輔導+實體預約
     """
     def execute(self, event):
-        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("counseling").get("select")).get('flex')
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("counseling")).get("select")
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='線上輔導+實體預約', contents=FlexContainer.from_json(line_flex_str))])
 
 class Equipment(Template):
@@ -81,5 +81,5 @@ class Equipment(Template):
     設備租借
     """
     def execute(self, event):
-        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("equipment").get("carousel")).get('flex')
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("equipment")).get("select")
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_str))])

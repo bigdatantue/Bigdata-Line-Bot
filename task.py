@@ -54,8 +54,8 @@ class Course(Task):
             course = __class__.__get_course_records(id=course_record_id)[0]
             line_flex_template = firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("course").get("detail")
-            ).get('flex')
+                DatabaseDocumentMap.LINE_FLEX.get("course")
+            ).get('detail')
             params = LineBotHelper.map_params(course, FlexParamMap.COURSE)
             line_flex_str = LineBotHelper.replace_variable(line_flex_template, params)
             
@@ -77,8 +77,8 @@ class Course(Task):
             else:
                 line_flex_template = firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX, 
-                    DatabaseDocumentMap.LINE_FLEX.get("course").get("carousel")
-                ).get('flex')
+                    DatabaseDocumentMap.LINE_FLEX.get("course")
+                ).get('summary')
                 line_flex_json = FlexMessageHelper.create_carousel_bubbles(courses, json.loads(line_flex_template), FlexParamMap.COURSE)
                 line_flex_str = json.dumps(line_flex_json)
                 LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=FlexContainer.from_json(line_flex_str))])
@@ -88,8 +88,8 @@ class Course(Task):
         else:
             quick_reply_data = firebaseService.get_data(
                 DatabaseCollectionMap.QUICK_REPLY,
-                DatabaseDocumentMap.QUICK_REPLY.get("course").get("category")
-            )
+                DatabaseDocumentMap.QUICK_REPLY.get("course")
+            ).get("category")
             for i, text in enumerate(quick_reply_data.get('actions')):
                 quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
             LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
@@ -127,8 +127,8 @@ class Communtity(Task):
         microcourses = spreadsheetService.get_worksheet_data('microcourses')
         line_flex_template = firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("community").get("microcourse")
-        ).get('flex')
+            DatabaseDocumentMap.LINE_FLEX.get("community")
+        ).get("microcourse")
         line_flex_json = FlexMessageHelper.create_carousel_bubbles(microcourses, json.loads(line_flex_template), FlexParamMap.COMMUNITY)
         line_flex_str = json.dumps(line_flex_json)
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])
@@ -154,15 +154,15 @@ class Counseling(Task):
         if counseling_type == 'online':
             line_flex_str = firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling").get("online")
-            ).get('flex')
+                DatabaseDocumentMap.LINE_FLEX.get("counseling")
+            ).get("online")
             LineBotHelper.reply_message(event, [FlexMessage(alt_text='線上輔導', contents=FlexContainer.from_json(line_flex_str))])
             return
         else:
             line_flex_str = firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling").get("physical")
-            ).get('flex')
+                DatabaseDocumentMap.LINE_FLEX.get("counseling")
+            ).get("physical")
             LineBotHelper.reply_message(event, [FlexMessage(alt_text='實體預約', contents=FlexContainer.from_json(line_flex_str))])
             return
         
@@ -187,8 +187,8 @@ class Equipment(Task):
                 borrow_records = __class__.__get_borrow_records(borrower_user_id, borrower_id)
                 line_flex_template = firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
-                ).get('flex')
+                    DatabaseDocumentMap.LINE_FLEX.get("equipment")
+                ).get("record")
                 line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
                 line_flex_str = json.dumps(line_flex_json)
                 LineBotHelper.reply_message(event, [TextMessage(text='設備租借核准'), FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
@@ -203,7 +203,7 @@ class Equipment(Task):
         if user_msg:
             # 如果有使用者輸入文字，則進入填寫借用人資料流程
             borrower_info = firebaseService.get_data(DatabaseCollectionMap.TEMP, user_id)
-            prompts = ['請輸入系級', '請輸入email', '請輸入手機號碼', '已送出租借申請']
+            prompts = ['請輸入系所班級', '請輸入email', '請輸入手機號碼', '已送出租借申請']
             keys = ['name', 'department', 'email', 'phone']
             for key, prompt in zip(keys, prompts):
                 if key not in borrower_info['borrowerData']:
@@ -218,8 +218,10 @@ class Equipment(Task):
                         user_info_data = spreadsheetService.get_worksheet_data('user_info')
                         user_info_data = [user for user in user_info_data if user.get('permission') >= Permission.LEADER]
                         user_ids = [user.get('user_id') for user in user_info_data]
-                        line_flex_str = firebaseService.get_data(DatabaseCollectionMap.LINE_FLEX, DatabaseDocumentMap.LINE_FLEX.get("equipment").get("approve")).get('flex')
-                        # return LineBotHelper.reply_message(event, [TextMessage(text=prompt), FlexMessage(alt_text='申請核准', contents=FlexContainer.from_json(line_flex_decision))])
+                        line_flex_str = firebaseService.get_data(
+                            DatabaseCollectionMap.LINE_FLEX,
+                            DatabaseDocumentMap.LINE_FLEX.get("equipment")
+                        ).get("approve")
                         items = {
                             'equipment_name': Map.EQUIPMENT_NAME.get(int(borrower_info['equipment_id'])),
                             'borrower_user_id': user_id,
@@ -234,7 +236,7 @@ class Equipment(Task):
                             'return_time': borrower_info['returnTime']
                         }
                         line_flex_str = LineBotHelper.replace_variable(line_flex_str, items)
-                        return LineBotHelper.multicast_message(user_ids, [FlexMessage(alt_text='租借申請確認', contents=FlexContainer.from_json(line_flex_str))])
+                        LineBotHelper.multicast_message(user_ids, [FlexMessage(alt_text='租借申請確認', contents=FlexContainer.from_json(line_flex_str))])
                     return LineBotHelper.reply_message(event, [TextMessage(text=prompt)])
         else:
             type = params.get('type')
@@ -270,8 +272,8 @@ class Equipment(Task):
                     item = params.get('item')
                     line_flex_template = firebaseService.get_data(
                         DatabaseCollectionMap.LINE_FLEX,
-                        DatabaseDocumentMap.LINE_FLEX.get("equipment").get("confirm")
-                    ).get('flex')
+                        DatabaseDocumentMap.LINE_FLEX.get("equipment")
+                    ).get("confirm")
                     items = {
                         'equipment_id': equipment_id,
                         'equipment_name': Map.EQUIPMENT_NAME.get(int(equipment_id)),
@@ -290,8 +292,8 @@ class Equipment(Task):
                     # 選擇租借數量
                     quick_reply_data = firebaseService.get_data(
                         DatabaseCollectionMap.QUICK_REPLY,
-                        DatabaseDocumentMap.QUICK_REPLY.get("equipment").get("amount")
-                    )
+                        DatabaseDocumentMap.QUICK_REPLY.get("equipment")
+                    ).get("amount")
                     for i, text in enumerate(quick_reply_data.get('actions')):
                         quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
                     return LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
@@ -310,8 +312,8 @@ class Equipment(Task):
 
                     line_flex_template = firebaseService.get_data(
                         DatabaseCollectionMap.LINE_FLEX,
-                        DatabaseDocumentMap.LINE_FLEX.get("equipment").get("borrow")
-                    ).get('flex')
+                        DatabaseDocumentMap.LINE_FLEX.get("equipment")
+                    ).get("equipment_summary")
                     line_flex_template = FlexMessageHelper.create_carousel_bubbles(equipments, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
                     line_flex_template = json.dumps(line_flex_template)
                     return LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_template))])
@@ -323,8 +325,8 @@ class Equipment(Task):
                     return
                 line_flex_template = firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("equipment").get("search")
-                ).get('flex')
+                    DatabaseDocumentMap.LINE_FLEX.get("equipment")
+                ).get("record")
                 line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
                 line_flex_str = json.dumps(line_flex_json)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])

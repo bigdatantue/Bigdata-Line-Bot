@@ -89,41 +89,16 @@ class DatabaseDocumentMap:
         "b": "page2"
     }
     LINE_FLEX = {
-        "menu": {
-            "main": "ltWn6U09IULOHB6rpfyP"
-        },
-        "course": {
-            "carousel": "tGSG2ubenRbo7jPB3Uy4",
-            "detail": "WLMwWm4x5fxaErVmFKeH"
-        },
-        "certificate": {
-            "carousel": "M3SylLgx9hHH7vSrPNuu",
-        },
-        "community": {
-            "carousel": "m4d0AbQPWK2t5AlSTbl0",
-            "microcourse": "by8eewOekAKTjl7gu4OH"
-        },
-        "counseling": {
-            "select": "waLYz91Ia1z8TKrhkGSZ",
-            "online": "xNzv8OupG7Ph4ujJ8hrp",
-            "physical": "QZogxSAeeA4SooowIwTO"
-        },
-        "equipment": {
-            "carousel": "1Q2N5tLGQsW0PLuaRfyk",
-            "borrow": "Yua6r0nL1lSHEB3qIJTP",
-            "search": "eWdGFYXpKeScIDKQIOkc",
-            "confirm": "eA6KrG2kgkvz6U7IghFo",
-            "approve": "YdnF1TBt3tfKbDkpO12t"
-        }
+        "menu": "menu",
+        "course": "course",
+        "certificate": "certificate",
+        "community": "community",
+        "counseling": "counseling",
+        "equipment": "equipment"
     }
     QUICK_REPLY = {
-        "course": {
-            "semester": "0ZKS1zEG8aNb5GfsBQ6e",
-            "category": "svGO9YamzyGwjHXZPMpS"
-        },
-        "equipment": {
-            "amount": "ULjCDTW63ie3yxA1462z"
-        }
+        "course": "course",
+        "equipment": "equipment"
     }
 
 class FlexParamMap:
