@@ -3,6 +3,7 @@ from strategy import TaskStrategy, TemplateStrategy
 from map import Map, FeatureStatus, Permission
 from api.linebot_helper import LineBotHelper, RichMenuHelper
 from flask import Flask, request, abort
+from line_notify_app import line_notify_app
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -19,6 +20,7 @@ from linebot.v3.messaging import (
 )
 
 app = Flask(__name__)
+app.register_blueprint(line_notify_app, url_prefix='/notify')
 
 # 初始化 Config
 config = Config()
@@ -55,12 +57,12 @@ def handle_follow(event):
     # 取得使用者ID
     user_id = event.source.user_id
     # 檢查使用者是否存在，若不存在則新增至試算表
-    if not spreadsheetService.check_user_exists(user_id):
+    if not spreadsheetService.check_user_exists('user_info', user_id):
         user_info = LineBotHelper.get_user_info(user_id)
         user_info.insert(0, user_id)
         # 新增一般使用者權限
         user_info.append(Permission.USER)
-        spreadsheetService.add_user(user_info)
+        spreadsheetService.add_user('user_info', user_info)
         
     #使用者在試算表的好友狀態設為True
     spreadsheetService.set_user_status(user_id, True)
@@ -111,7 +113,7 @@ def handle_message(event):
             strategy_class = strategy.strategy_action()
             if strategy_class:
                 task = strategy_class()
-                task.execute(event)
+                task.execute(event, request=request)
                 return
     elif temp:
         # 動態選擇Task Strategy(功能中需要使用者輸入文字)
