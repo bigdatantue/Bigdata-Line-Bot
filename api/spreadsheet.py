@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 
 class SpreadsheetService:
     def __init__(self, gc, url):
@@ -44,7 +45,8 @@ class SpreadsheetService:
         column_index = self.get_column_index(wks, 'is_active')
         wks.update_value((user_row_index, column_index), is_active)
         #紀錄時間
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        taiwan_tz = pytz.timezone('Asia/Taipei')
+        timestamp = datetime.now(taiwan_tz).strftime('%Y-%m-%d %H:%M:%S')
         column_index = self.get_column_index(wks, 'timestamp')
         wks.update_value((user_row_index, column_index), timestamp)
     
