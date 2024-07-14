@@ -1,3 +1,5 @@
+from datetime import datetime
+
 class SpreadsheetService:
     def __init__(self, gc, url):
         self.gc = gc
@@ -35,12 +37,16 @@ class SpreadsheetService:
         
     def set_user_status(self, user_id, is_active):
         """
-        設定使用者的is_active
+        設定使用者的is_active及更新時間
         """
         wks = self.sh.worksheet_by_title('user_info')
         user_row_index = self.get_user_row_index(wks, user_id)
         column_index = self.get_column_index(wks, 'is_active')
         wks.update_value((user_row_index, column_index), is_active)
+        #紀錄時間
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        column_index = self.get_column_index(wks, 'timestamp')
+        wks.update_value((user_row_index, column_index), timestamp)
     
     def get_worksheet_data(self, title: str):
         """
