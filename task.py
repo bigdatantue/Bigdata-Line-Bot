@@ -300,16 +300,22 @@ class Equipment(Task):
                 else:
                     # 選擇租借設備
                     equipments = spreadsheetService.get_worksheet_data('equipments')
-                    equipment_status_data = firebaseService.get_collection_data('equipments')
 
-                    # 計算設備總數、已借出數、可借出數
                     for i in range(len(equipments)):
-                        total_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id')])
-                        lend_amount = len([equipment for equipment in equipment_status_data if equipment.get('type') == equipments[i].get('equipment_id') and equipment.get('status') == EquipmentStatus.LEND])
+                        equipment_id = equipments[i].get('equipment_id')
+                        
+                        total_conditions = [('type', '==', equipment_id)]
+                        total_amount = len(firebaseService.filter_data('equipments', total_conditions))
+                        lend_conditions = [
+                            ('type', '==', equipment_id),
+                            ('status', '==', EquipmentStatus.LEND)
+                        ]
+                        lend_amount = len(firebaseService.filter_data('equipments', lend_conditions))
+                        
+                        # 更新設備資訊
                         equipments[i]['total_amount'] = total_amount
                         equipments[i]['lend_amount'] = lend_amount
                         equipments[i]['available_amount'] = total_amount - lend_amount
-
                     line_flex_template = firebaseService.get_data(
                         DatabaseCollectionMap.LINE_FLEX,
                         DatabaseDocumentMap.LINE_FLEX.get("equipment")
@@ -365,9 +371,11 @@ class Equipment(Task):
         Returns
         str: 借用者id
         """
-        equipment_status_data = firebaseService.get_collection_data('equipments')
-        # 取得可借出的設備
-        equipment_status_data = [equipment for equipment in equipment_status_data if str(equipment.get('type')) == params.get('equipment_id') and equipment.get('status') == EquipmentStatus.AVAILABLE]
+        conditions = [
+            ('type', '==', int(params.get('equipment_id'))),
+            ('status', '==', EquipmentStatus.AVAILABLE)
+        ]
+        equipment_status_data = firebaseService.filter_data('equipments', conditions)
         # 隨機產生id
         borrower_id = LineBotHelper.generate_id()
         # 更新設備狀態
@@ -387,25 +395,28 @@ class Equipment(Task):
         """Returns
         list: 借用紀錄
         """
-        equipments = firebaseService.get_collection_data('equipments')
-        
+        conditions = [('borrower', '==', user_id)]
+        equipments = firebaseService.filter_data('equipments', conditions)
+
+        if borrower_id:
+            conditions.append(('borrowerId', '==', borrower_id))
+
+        equipments = firebaseService.filter_data('equipments', conditions)
         borrow_records_dict = {}
         for equipment in equipments:
-            # 前者為該使用者借用的所有設備，後者為該使用者借用且為borrower_id的設備
-            if (not borrower_id and equipment.get('borrower') == user_id) or (borrower_id and equipment.get('borrower') == user_id and equipment.get('borrowerId') == borrower_id):
-                # borrower_id_ 多一個底線是為了避免與參數名稱衝突
-                borrower_id_ = equipment.get('borrowerId')
-                if borrower_id_ not in borrow_records_dict:
-                    borrow_records_dict[borrower_id_] = {
-                        'amount': 0,
-                        'equipment_name': equipment.get('name'),
-                        'start_date': equipment.get('startDate'),
-                        'end_date': equipment.get('endDate'),
-                        'return_time': equipment.get('returnTime'),
-                        'id': []
-                    }
-                borrow_records_dict[borrower_id_]['amount'] += 1
-                borrow_records_dict[borrower_id_]['id'].append(equipment.get('_id'))
+            # borrower_id_ 多一個底線是為了避免與參數名稱衝突
+            borrower_id_ = equipment.get('borrowerId')
+            if borrower_id_ not in borrow_records_dict:
+                borrow_records_dict[borrower_id_] = {
+                    'amount': 0,
+                    'equipment_name': equipment.get('name'),
+                    'start_date': equipment.get('startDate'),
+                    'end_date': equipment.get('endDate'),
+                    'return_time': equipment.get('returnTime'),
+                    'id': []
+                }
+            borrow_records_dict[borrower_id_]['amount'] += 1
+            borrow_records_dict[borrower_id_]['id'].append(equipment.get('_id'))
 
         # 將借用紀錄整理成list(不需要borrower_id_這個key了，只把需要的資料取出來)
         borrow_records = []
