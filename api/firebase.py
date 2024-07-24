@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 class FireBaseService:
     def __init__(self, cred):
@@ -18,6 +19,15 @@ class FireBaseService:
         doc_ref = self.db.collection(collection).document(doc_id)
         doc = doc_ref.get()
         return doc.to_dict()
+    
+    def filter_data(self, collection, conditions):
+        """篩選資料"""
+        collection_ref = self.db.collection(collection)
+        for condition in conditions:
+            collection_ref = collection_ref.where(filter=FieldFilter(*condition))
+        docs = collection_ref.stream()
+        return [doc.to_dict() for doc in docs]
+    
     
     def add_data(self, collection, doc_id, data):
         """新增資料"""
