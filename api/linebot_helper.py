@@ -9,9 +9,6 @@ from linebot.v3.messaging import (
     MulticastRequest,
     PushMessageRequest,
     RichMenuRequest,
-    RichMenuArea,
-    RichMenuSize,
-    RichMenuBounds,
     URIAction,
     MessageAction,
     PostbackAction,
@@ -136,99 +133,40 @@ class LineBotHelper:
         else:
             raise ValueError('Invalid action type')
 
-class RichMenuHelper:
-    def create_rich_menu_areas(rich_menu):
-        """Returns
-        list: 圖文選單的areas
-        """
-        return [
-            RichMenuArea(
-                bounds=RichMenuBounds(
-                    x=info['bounds']['x'],
-                    y=info['bounds']['y'],
-                    width=info['bounds']['width'],
-                    height=info['bounds']['height']
-                ),
-                action=LineBotHelper.create_action(info['action'])
-            ) for info in rich_menu['areas']
-        ]
-    
-    def create_rich_menu_request(rich_menu, areas):
-        """Returns
-        RichMenuRequest: 圖文選單的request
-        """
-        return RichMenuRequest(
-            size=RichMenuSize(width=rich_menu['size']['width'], height=rich_menu['size']['height']),
-            selected=rich_menu['selected'],
-            name=rich_menu['name'],
-            chat_bar_text=rich_menu['chatBarText'],
-            areas=areas
-        )
-    
-    def set_rich_menu_image(line_bot_blob_api, rich_menu_id, image_url):
-        """
-        設定圖文選單的圖片
-        """
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            raise ValueError('Invalid image url')
-        else:
-            line_bot_blob_api.set_rich_menu_image(
-                rich_menu_id=rich_menu_id,
-                body=response.content,
-                _headers={'Content-Type': 'image/png'}
-            )
-    
-    def create_rich_menu_alias(line_bot_api, alias_id, rich_menu_id):
-        """
-        建立圖文選單的alias
-        """
-        try:
-            line_bot_api.delete_rich_menu_alias(alias_id)
-        except ApiException as e:
-            if e.status != 404:
-                raise
-        alias = CreateRichMenuAliasRequest(
-            rich_menu_alias_id=alias_id,
-            rich_menu_id=rich_menu_id
-        )
-        line_bot_api.create_rich_menu_alias(alias)
 
-    @staticmethod
-    def create_rich_menu():
-        """
-        建立圖文選單
-        """
-        with ApiClient(configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            line_bot_blob_api = MessagingApiBlob(api_client)
+# class RichMenuHelper:
+    # with ApiClient(configuration) as api_client:
+    #     line_bot_api = MessagingApi(api_client)
+    #     line_bot_api_blob = MessagingApiBlob(api_client)
+    #     # CRUD of rich menu
+    #     line_bot_api.create_rich_menu(RichMenuRequest.from_json(
+    #         firebaseService.get_data(
+    #             DatabaseCollectionMap.RICH_MENU,
+    #             DatabaseDocumentMap.RICH_MENU
+    #         )
+    #     ))
+    #     line_bot_api.get_rich_menu('a')
+    #     line_bot_api.get_rich_menu_list()
+    #     line_bot_api.set_default_rich_menu('a')
+    #     line_bot_api.delete_rich_menu('a')
+    #     # CRUD of rich menu alias
+    #     line_bot_api.create_rich_menu_alias(
+    #         CreateRichMenuAliasRequest(
+    #             richMenuAliasId='page1',
+    #             richMenuId='a'
+    #         )
+    #     )
+    #     line_bot_api.get_rich_menu_alias('page1')
+    #     line_bot_api.get_rich_menu_alias_list()
+    #     line_bot_api.update_rich_menu_alias(
+    #         'page1',
+    #         CreateRichMenuAliasRequest(richMenuAliasId='page1', richMenuId='a')
+    #     )
+    #     line_bot_api.delete_rich_menu_alias('page1')
+    #     # CRUD of rich menu image
+    #     line_bot_api_blob.get_rich_menu_image('a')
+    #     line_bot_api_blob.set_rich_menu_image('a', 'image_path')
 
-            # 圖文選單 A
-            rich_menu_a_data = firebaseService.get_data(
-                DatabaseCollectionMap.RICH_MENU,
-                DatabaseDocumentMap.RICH_MENU.get('a')
-            )
-            rich_menu_a = json.loads(rich_menu_a_data.get('richmenu'))
-            rich_menu_a_to_create = __class__.create_rich_menu_request(rich_menu_a, __class__.create_rich_menu_areas(rich_menu_a))
-
-            rich_menu_a_id = line_bot_api.create_rich_menu(rich_menu_request=rich_menu_a_to_create).rich_menu_id
-            rich_menu_a_url = rich_menu_a_data.get('image_url')
-            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_a_id, rich_menu_a_url)
-            __class__.create_rich_menu_alias(line_bot_api, 'page1', rich_menu_a_id)
-
-            line_bot_api.set_default_rich_menu(rich_menu_a_id)
-
-            # 圖文選單 B
-            rich_menu_b_data = firebaseService.get_data(
-                DatabaseCollectionMap.RICH_MENU,
-                DatabaseDocumentMap.RICH_MENU.get("b")
-            )
-            rich_menu_b = json.loads(rich_menu_b_data.get('richmenu'))
-            rich_menu_b_to_create = __class__.create_rich_menu_request(rich_menu_b, __class__.create_rich_menu_areas(rich_menu_b))
-            rich_menu_b_id = line_bot_api.create_rich_menu(rich_menu_request=rich_menu_b_to_create).rich_menu_id
-            rich_menu_b_url = rich_menu_b_data.get('image_url')
-            __class__.set_rich_menu_image(line_bot_blob_api, rich_menu_b_id, rich_menu_b_url)
-            __class__.create_rich_menu_alias(line_bot_api, 'page2', rich_menu_b_id)
 
 class QuickReplyHelper:
     @staticmethod
