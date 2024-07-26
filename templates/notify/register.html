@@ -2,6 +2,29 @@
 {% block title %}連動Line Notify{% endblock %}
 {% block content %}
 
-<a href="{{ url }}">連結「國北教大教育大數據微學程」Line Notify服務</a>
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title text-primary">連動 Line Notify 服務</h2>
+            <p class="card-text">歡迎使用「國北教大教育大數據微學程」的 Line Notify 服務！透過此服務，您將能夠接收到來自我們系統的重要通知和更新資訊。</p>
+            
+            <h3 class="text-success">如何連動</h3>
+            <ol>
+                <li>點擊下方的按鈕，將跳轉至 Line Notify 授權頁面。</li>
+                <li>選擇您要接收通知的聊天群組或個人。</li>
+                <li>授權完成後，您將會接收到來自我們的通知。</li>
+            </ol>
+
+            <h3 class="text-danger">注意事項</h3>
+            <ul>
+                <li>請確保您已登入 Line 帳號。</li>
+                <li>選擇正確的群組或個人以接收通知。</li>
+                <li>您可以隨時在 Line Notify 的設定中取消授權。</li>
+            </ul>
+
+            <a href="{{ url }}" class="btn btn-primary mt-3 w-100">連結 Line Notify 服務</a>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
