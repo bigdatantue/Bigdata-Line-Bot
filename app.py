@@ -1,7 +1,7 @@
 from config import Config
 from strategy import TaskStrategy, TemplateStrategy
 from map import Map, FeatureStatus, Permission
-from api.linebot_helper import LineBotHelper, RichMenuHelper
+from api.linebot_helper import LineBotHelper
 from flask import Flask, request, abort
 from line_notify_app import line_notify_app
 from linebot.v3.exceptions import (
@@ -147,10 +147,7 @@ def handle_postback(event):
         task = strategy_class()
         task.execute(event, params)
         return
-      
 
-# 初始化 Rich Menu
-RichMenuHelper.create_rich_menu()
 
 if __name__ == "__main__":
     app.run()
