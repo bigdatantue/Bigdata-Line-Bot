@@ -38,6 +38,10 @@ class Config(metaclass=Singleton):
         if self.CHANNEL_SECRET is None or self.CHANNEL_ACCESS_TOKEN is None:
             print("Please set LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN environment variables.")
             sys.exit(1)
+
+        if os.getenv('GDRIVE_API_CREDENTIALS') is None:
+            print("Please set GDRIVE_API_CREDENTIALS environment variable.")
+            sys.exit(1)
         
         if self.SPREADSHEET_URL is None:
             print("Please set SPREADSHEET_URL environment variable.")
@@ -50,6 +54,10 @@ class Config(metaclass=Singleton):
         if self.LINE_NOTIFY_CLIENT_ID is None or self.LINE_NOTIFY_CLIENT_SECRET is None:
             print("Please set LINE_NOTIFY_CLIENT_ID, LINE_NOTIFY_CLIENT_SECRET environment variables.")
             sys.exit(1)
+
+        if os.getenv('LIFF_ID_COMPACT') is None or os.getenv('LIFF_ID_TALL') is None or os.getenv('LIFF_ID_FULL') is None:
+            print("Please set LIFF_ID_COMPACT, LIFF_ID_TALL, LIFF_ID_FULL environment variables.")
+            sys.exit(1)        
 
     def line_bot_init(self):
         """初始化LINE Bot相關物件"""

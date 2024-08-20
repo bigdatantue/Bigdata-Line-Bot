@@ -4,6 +4,7 @@ from map import Map, FeatureStatus, Permission
 from api.linebot_helper import LineBotHelper
 from flask import Flask, request, abort
 from line_notify_app import line_notify_app
+from liff_app import liff_app
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -21,6 +22,7 @@ from linebot.v3.messaging import (
 
 app = Flask(__name__)
 app.register_blueprint(line_notify_app, url_prefix='/notify')
+app.register_blueprint(liff_app, url_prefix='/liff')
 
 # 初始化 Config
 config = Config()

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}使用者資訊表單{% endblock %}
+{% block content %}
+<h1>測試</h1>
+<div class="row" style="margin: 10px">
+    <div class="col-12" style="margin: 10px">
+        <label>借用人姓名:
+        </label>
+        <input type="text" id="name" class="form-control" />
+        <br />
+        <label>手機:
+        </label>
+        <input type="text" id="phone" class="form-control" />
+        <br />
+        <label>Email:</label>
+        <input type="email" id="email" class="form-control" />
+        <br />
+        <label> 租用人身分:</label>
+        <select id="identity" class="form-control">
+            <option value="1">個人(學生)</option>
+            <option value="2">個人(教師)</option>
+            <option value="3">團體(師或生)</option>
+        </select>
+        <br />
+        <button class="btn btn-success btn-block" id="sure">確定</button>
+    </div>
+</div>
+
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+    var user_id;
+    var name;
+    var picUrl;
+    function initializeLiff(liffId) {
+        liff.init({
+            liffId: liffId
+        }).then(() => {
+            if (!liff.isLoggedIn()) {
+                // alert("用戶未登入");
+                liff.login();
+            } else {
+                // alert("用戶已登入");
+                liff.getProfile()
+                    .then(profile => {
+                        name = profile.displayName;
+                        userId = profile.userId;
+                        picUrl = profile.pictureUrl;
+                    })
+                    .catch((err) => {
+                        console.log('error', err);
+                    });
+            }
+        }).catch((err) => {
+            console.log('初始化失敗', err);
+        });
+    }
+
+
+    function pushMsg(data) {
+        for (var key in data) {
+            if (data[key] == '') {  //資料檢查
+                alert('每個項目都必須輸入！');
+                return;
+            }
+        }
+        var msg = "###";  //回傳訊息字串
+        for (var key in data) {
+            msg += key + ":" + data[key] + "\n";
+        }
+		liff.sendMessages([{ 
+            type: 'text',
+            text: msg
+        }])
+        // liff.sendMessages([{
+        //     type: 'flex',
+        //     altText: 'User Info',
+        //     contents: {
+        //         "type": "bubble",
+        //         "body": {
+        //             "type": "box",
+        //             "layout": "vertical",
+        //             "contents": [
+        //             {
+        //                 "type": "text",
+        //                 "text": "User Info",
+        //                 "weight": "bold",
+        //                 "size": "xl"
+        //             }
+        //             ]
+        //         }
+        //     }
+        // }])
+        .then(() => {
+            liff.closeWindow();  //關閉視窗
+        });
+    }
+         
+
+    $(document).ready(function () { 
+        initializeLiff('{{ liff_id }}');  //接收傳遞的 liffid 參數
+        $('#sure').click(function (e) {  //按下確定鈕
+            data = {
+                'name': $('#name').val(),
+                'phone': $('#phone').val(),
+                'email': $('#email').val(),
+                'identity': $('#identity').val()
+            };
+            pushMsg(data);
+        });
+    });
+</script>
+{% endblock %}
