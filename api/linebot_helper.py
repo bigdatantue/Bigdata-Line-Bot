@@ -191,11 +191,13 @@ class RichMenuHelper:
             __class__.create_rich_menu_alias_(alias_id, rich_menu_id)
 
 #-----------------以下為設定rich menu的程式-----------------
-RichMenuHelper.create_rich_menu_('a', 'page1')
-RichMenuHelper.create_rich_menu_('b', 'page2')
-with ApiClient(configuration) as api_client:
-    line_bot_api = MessagingApi(api_client)
-    line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
+# 設定rich menu，並將alias id為page1的rich menu設為預設
+# RichMenuHelper.create_rich_menu_('a', 'page1')
+# RichMenuHelper.create_rich_menu_('b', 'page2')
+# with ApiClient(configuration) as api_client:
+#     line_bot_api = MessagingApi(api_client)
+#     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
+
 
 #-----------------以下為sdk提供的方法-----------------
 # with ApiClient(configuration) as api_client:
