@@ -1,4 +1,5 @@
 from enum import Enum, IntEnum
+import os
 
 class FeatureStatus(Enum):
     """
@@ -43,6 +44,17 @@ class Permission(IntEnum):
     LEADER = 3
     # 管理員
     ADMIN = 4
+
+class LIFFSize(Enum):
+    """
+    LIFF尺寸
+    """
+    # Compact
+    COMPACT = os.getenv('LIFF_ID_COMPACT')
+    # Tall
+    TALL = os.getenv('LIFF_ID_TALL')
+    # Full
+    FULL = os.getenv('LIFF_ID_FULL')
 
 class Map:
     """
