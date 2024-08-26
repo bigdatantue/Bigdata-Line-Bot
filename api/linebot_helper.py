@@ -15,8 +15,7 @@ from linebot.v3.messaging import (
     RichMenuSwitchAction,
     CreateRichMenuAliasRequest,
     QuickReply,
-    QuickReplyItem,
-    ShowLoadingAnimationRequest
+    QuickReplyItem
 )
 import requests
 import random
@@ -38,17 +37,6 @@ class LineBotHelper:
             user_info = line_bot_api.get_profile(user_id)
             return [user_info.display_name, user_info.picture_url]
         
-    @staticmethod
-    def show_loading_animation_(event, time: int=10):
-        """
-        顯示載入動畫
-        """
-        with ApiClient(configuration) as api_client:
-            line_bot_api = MessagingApi(api_client)
-            line_bot_api.show_loading_animation(
-                ShowLoadingAnimationRequest(chatId=event.source.user_id, loadingSeconds=time)
-            )
-
     @staticmethod
     def reply_message(event, messages: list):
         """
