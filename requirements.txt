@@ -1,4 +1,4 @@
-line-bot-sdk==3.11.1
+line-bot-sdk==3.7.0
 flask==3.0.0
 pygsheets==2.0.6
 firebase-admin==6.5.0
