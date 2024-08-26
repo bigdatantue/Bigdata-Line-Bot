@@ -55,7 +55,6 @@ def handle_follow(event):
     Handle加入好友事件
     """
     try:
-        LineBotHelper.show_loading_animation_(event)
         # 取得使用者ID
         user_id = event.source.user_id
         # 檢查使用者是否存在，若不存在則新增至試算表
@@ -108,7 +107,6 @@ def handle_message(event):
 
         # 判斷使用者輸入的文字是否為功能
         if feature:
-            LineBotHelper.show_loading_animation_(event)
             # 如果使用者跳出上個功能，則刪除暫存資料
             if temp:
                 firebaseService.delete_data('temp', user_id)
@@ -126,7 +124,6 @@ def handle_message(event):
                     task.execute(event, request=request)
                     return
         elif temp:
-            LineBotHelper.show_loading_animation_(event)
             # 動態選擇Task Strategy(功能中需要使用者輸入文字)
             strategy = TaskStrategy('message', temp.get('task'))
             strategy_class = strategy.strategy_action()
@@ -144,7 +141,6 @@ def handle_postback(event):
     Handle Postback事件
     """
     try:
-        LineBotHelper.show_loading_animation_(event)
         postback_data = event.postback.data
         # 如果有datetimpicker的參數，才會有postback_params
         postback_params = event.postback.params
