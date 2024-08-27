@@ -26,7 +26,8 @@ class TemplateFactory:
             'certificate': Certificate,
             'community': Communtity,
             'counseling': Counseling,
-            'equipment': Equipment
+            'equipment': Equipment,
+            'quiz': Quiz
         }
 
     def get_template(self, task_name):
@@ -95,3 +96,11 @@ class Equipment(Template):
     def execute(self, event, **kwargs):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("equipment")).get("select")
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_str))])
+
+class Quiz(Template):
+    """
+    知識測驗
+    """
+    def execute(self, event, **kwargs):
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("quiz")).get('start')
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='知識測驗', contents=FlexContainer.from_json(line_flex_str))])

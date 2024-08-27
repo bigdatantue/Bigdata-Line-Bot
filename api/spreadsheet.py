@@ -62,6 +62,18 @@ class SpreadsheetService:
         wks = self.sh.worksheet_by_title(title)
         return wks.get_all_records()
     
+    def update_cell_value(self, title: str, range: tuple, value: str):
+        """
+        Summary:
+            更新工作表資料
+        Args:
+            title: 工作表名稱
+            index: 要更新的列索引
+            data: 要更新的資料
+        """
+        wks = self.sh.worksheet_by_title(title)
+        wks.update_value(range, value)
+    
     def delete_row_data(self, title, index):
         """
         Summary:

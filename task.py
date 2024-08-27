@@ -12,6 +12,7 @@ import json
 import pandas as pd
 from datetime import datetime
 import re
+import random
 
 config = Config()
 spreadsheetService = config.spreadsheetService
@@ -30,7 +31,8 @@ class TaskFactory:
             'community': Communtity,
             'certificate': Certificate,
             'counseling': Counseling,
-            'equipment': Equipment
+            'equipment': Equipment,
+            'quiz': Quiz
         }
 
     def get_task(self, task_name):
@@ -425,3 +427,171 @@ class Equipment(Task):
             borrow_records.append(record)
 
         return borrow_records
+
+class Quiz(Task):
+    """
+    知識測驗
+    """
+    QUESTION_AMOUNT = 5
+
+    def execute(self, event, params):
+        user_id = event.source.user_id
+        question_no = params.get('no')
+        if question_no:
+            question_no = int(question_no)
+            # 使用者的答案
+            answer = params.get('answer').lower()
+
+            # 從temp取得題目
+            temp_data = firebaseService.get_data('temp', user_id)
+            quiz_questions = temp_data.get('questions')
+            if not quiz_questions:
+                LineBotHelper.reply_message(event, [TextMessage(text='若要進行測驗，請重新點選知識測驗！')])
+                return
+
+            # 判斷答案是否正確
+            last_quiz_question = quiz_questions[question_no - 1]
+            is_correct = answer == last_quiz_question.get('answer').lower()
+            answer_line_flex_str = __class__.__generate_answer_line_flex(last_quiz_question, is_correct)
+
+            # 記錄該題作答(選擇的答案人數+1)
+            __class__.__create_answer_record(user_id, temp_data.get('quiz_id'), last_quiz_question, answer, event.timestamp)
+            if is_correct:
+                temp_data['correct_amount'] += 1
+
+            if question_no < temp_data.get('question_amount'):
+                question_line_flex_str = __class__.__generate_question_line_flex(quiz_questions[question_no], question_no)
+                firebaseService.update_data('temp', user_id, {'no': question_no + 1, 'correct_amount': temp_data.get('correct_amount')})
+                LineBotHelper.reply_message(event, [
+                    FlexMessage(alt_text='測驗解答', contents=FlexContainer.from_json(answer_line_flex_str)),
+                    FlexMessage(alt_text='測驗題目', contents=FlexContainer.from_json(question_line_flex_str))
+                ])
+                return
+            else:
+                # 生成測驗結果
+                data = {
+                    'quiz_id': temp_data.get('quiz_id'),
+                    'correct_amount': temp_data.get('correct_amount'),
+                    'total_amount': temp_data.get('question_amount')
+                }
+                result_line_flex_str = __class__.__generate_quiz_result(user_id, data)
+                firebaseService.delete_data('temp', user_id)
+                LineBotHelper.reply_message(event, [
+                    FlexMessage(alt_text='測驗解答', contents=FlexContainer.from_json(answer_line_flex_str)),
+                    FlexMessage(alt_text='測驗結果', contents=FlexContainer.from_json(result_line_flex_str))
+                ])
+                return
+        else:
+            mode = params.get('mode')
+            category = params.get('category')
+            if mode == 'general':
+                # 一般測驗
+                if category:
+                    # 隨機抽取題目，並存入TEMP
+                    questions = spreadsheetService.get_worksheet_data('quiz')
+                    questions = [question for question in questions if question.get('category') == category]
+                    quiz_questions = random.sample(questions, __class__.QUESTION_AMOUNT)
+                    data = {
+                        'task': 'quiz',
+                        'category': category,
+                        'no': 1,
+                        'questions': quiz_questions,
+                        'question_amount': __class__.QUESTION_AMOUNT,
+                        'correct_amount': 0,
+                        'quiz_id': LineBotHelper.generate_id()
+                    }
+                    firebaseService.add_data(DatabaseCollectionMap.TEMP, user_id, data)
+
+                    line_flex_str = __class__.__generate_question_line_flex(quiz_questions[0], 0)
+                    LineBotHelper.reply_message(event, [FlexMessage(alt_text='測驗題目', contents=FlexContainer.from_json(line_flex_str))])
+                    return
+                else:
+                    line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("quiz")).get('select')
+                    line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"mode": mode})
+                    LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇測驗類別', contents=FlexContainer.from_json(line_flex_str))])
+                    return
+            else:
+                # 限時測驗
+                pass
+            
+    
+    def __generate_question_line_flex(question: dict, question_no: int):
+        """Returns
+        生成題目的Line Flex
+        """
+        gold_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+        gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
+
+        question.update({
+            'no': question_no + 1,
+            'width': (100 // __class__.QUESTION_AMOUNT) * question_no
+        })
+
+        line_flex_quiz = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        )
+        line_flex_str = line_flex_quiz.get('question_with_image') if question.get('image_url') else line_flex_quiz.get('question')
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
+        # 生成星星
+        difficulty = int(question.get('difficulty'))
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gold_star_url}, difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gray_star_url}, 5 - difficulty)
+        return line_flex_str
+    
+    def __generate_answer_line_flex(question: dict, is_correct: bool):
+        """Returns
+        生成答案的Line Flex
+        """
+        line_flex_quiz = firebaseService.get_data('line_flex', 'quiz')
+        line_flex_str = line_flex_quiz.get('correct') if is_correct else line_flex_quiz.get('wrong')
+
+        # 計算該題正確率
+        total_correct_amount = question.get(f"{question.get('answer').upper()}_vote_count")
+        total_correct_amount += 1 if is_correct else 0
+        total_count = question.get('total_count') + 1
+        correct_rate = round(total_correct_amount / total_count*100)
+        question.update({
+            'correct_rate': correct_rate
+        })
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
+        # 詳解有些有\n，改成在試算表裡面加上\\n
+        # line_flex_str = line_flex_str.replace('\n', '\\n')
+        return line_flex_str
+
+    def __create_answer_record(user_id: str, quiz_id: str, question: dict, answer: str, timestamp: int):
+        """
+        記錄該題作答(選擇的答案人數+1)
+        """
+        column_map = {
+            'a': 'A_vote_count',
+            'b': 'B_vote_count',
+            'c': 'C_vote_count',
+            'd': 'D_vote_count'
+        }
+        column_name = column_map.get(answer)
+        wks = spreadsheetService.sh.worksheet_by_title('quiz')
+        col_index = spreadsheetService.get_column_index(wks, column_name)
+        row_index = int(question.get('id')) + 1
+        spreadsheetService.update_cell_value('quiz', (row_index, col_index), int(question.get(column_name)) + 1)
+
+        # 紀錄該題作答
+        question_id = question.get('id')
+        wks = spreadsheetService.sh.worksheet_by_title('quiz_records')
+        wks.append_table(values=[quiz_id, user_id, question_id, answer, timestamp])
+
+    # 生成測驗結果
+    def __generate_quiz_result(user_id: str, params: dict):
+        """
+        生成測驗結果
+        """
+        correct_amount = params.get('correct_amount')
+        line_flex_str = firebaseService.get_data('line_flex', 'quiz').get('result')
+        # 個別測驗紀錄正確率
+        wks = spreadsheetService.sh.worksheet_by_title('quiz_log')
+        wks.append_table(values=[params.get('quiz_id'), user_id, correct_amount])
+        quiz_logs = spreadsheetService.get_worksheet_data('quiz_log')
+        defeat_rate = round(len([log for log in quiz_logs if log['correct_amount'] < correct_amount])/len(quiz_logs)*100, 2) if correct_amount > 0 else 0
+        params.update({'defeat_rate': defeat_rate})
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
+        return line_flex_str
