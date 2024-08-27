@@ -57,7 +57,8 @@ class Map:
         '社群學習資源': 'community',
         '線上輔導+實體預約': 'counseling',
         '設備租借': 'equipment',
-        '計畫成果展示': 'gallery'
+        '計畫成果展示': 'gallery',
+        '知識測驗': 'quiz'
     }
     COURSE = {
         'overview': '總覽',
@@ -94,7 +95,8 @@ class DatabaseDocumentMap:
         "certificate": "certificate",
         "community": "community",
         "counseling": "counseling",
-        "equipment": "equipment"
+        "equipment": "equipment",
+        "quiz": "quiz"
     }
     QUICK_REPLY = {
         "course": "course",
