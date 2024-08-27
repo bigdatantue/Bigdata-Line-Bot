@@ -36,7 +36,7 @@ class LineBotHelper:
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
             user_info = line_bot_api.get_profile(user_id)
-            return [user_info.display_name, user_info.picture_url]
+            return [user_info.display_name, user_info.picture_url, user_info.language, user_info.status_message]
 
     @staticmethod
     def show_loading_animation_(event, time: int=10):
