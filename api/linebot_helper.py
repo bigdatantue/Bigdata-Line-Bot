@@ -15,7 +15,8 @@ from linebot.v3.messaging import (
     RichMenuSwitchAction,
     CreateRichMenuAliasRequest,
     QuickReply,
-    QuickReplyItem
+    QuickReplyItem,
+    ShowLoadingAnimationRequest
 )
 import requests
 import random
@@ -36,6 +37,17 @@ class LineBotHelper:
             line_bot_api = MessagingApi(api_client)
             user_info = line_bot_api.get_profile(user_id)
             return [user_info.display_name, user_info.picture_url]
+
+    @staticmethod
+    def show_loading_animation_(event, time: int=10):
+        """
+        顯示載入動畫
+        """
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.show_loading_animation(
+                ShowLoadingAnimationRequest(chatId=event.source.user_id, loadingSeconds=time)
+            )
         
     @staticmethod
     def reply_message(event, messages: list):
@@ -190,45 +202,57 @@ class RichMenuHelper:
             __class__.set_rich_menu_image_(rich_menu_id, rich_menu_url)
             __class__.create_rich_menu_alias_(alias_id, rich_menu_id)
 
-    #-----------------以下為設定richf menu的程式-----------------
-    # create_rich_menu_('a', 'page1')
-    # create_rich_menu_('b', 'page2')   
-    # with ApiClient(configuration) as api_client:
-    #     line_bot_api = MessagingApi(api_client)
-    #     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
+#-----------------以下為設定rich menu的程式-----------------
+# 設定rich menu，並將alias id為page1的rich menu設為預設
+# RichMenuHelper.create_rich_menu_('a', 'page1')
+# RichMenuHelper.create_rich_menu_('b', 'page2')
+# with ApiClient(configuration) as api_client:
+#     line_bot_api = MessagingApi(api_client)
+#     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
 
-    #-----------------以下為sdk提供的方法-----------------
-    # with ApiClient(configuration) as api_client:
-    #     line_bot_api = MessagingApi(api_client)
-    #     line_bot_api_blob = MessagingApiBlob(api_client)
-    #     # CRUD of rich menu
-    #     line_bot_api.create_rich_menu(RichMenuRequest.from_json(
-    #         firebaseService.get_data(
-    #             DatabaseCollectionMap.RICH_MENU,
-    #             DatabaseDocumentMap.RICH_MENU
-    #         )
-    #     ))
-    #     line_bot_api.get_rich_menu('a')
-    #     line_bot_api.get_rich_menu_list()
-    #     line_bot_api.set_default_rich_menu('a')
-    #     line_bot_api.delete_rich_menu('a')
-    #     # CRUD of rich menu alias
-    #     line_bot_api.create_rich_menu_alias(
-    #         CreateRichMenuAliasRequest(
-    #             richMenuAliasId='page1',
-    #             richMenuId='a'
-    #         )
-    #     )
-    #     line_bot_api.get_rich_menu_alias('page1')
-    #     line_bot_api.get_rich_menu_alias_list()
-    #     line_bot_api.update_rich_menu_alias(
-    #         'page1',
-    #         CreateRichMenuAliasRequest(richMenuAliasId='page1', richMenuId='a')
-    #     )
-    #     line_bot_api.delete_rich_menu_alias('page1')
-    #     # CRUD of rich menu image
-    #     line_bot_api_blob.get_rich_menu_image('a')
-    #     line_bot_api_blob.set_rich_menu_image('a', 'image_path')
+
+#-----------------以下為sdk提供的方法-----------------
+# with ApiClient(configuration) as api_client:
+#     line_bot_api = MessagingApi(api_client)
+#     line_bot_api_blob = MessagingApiBlob(api_client)
+#     # CRUD of rich menu
+#     line_bot_api.create_rich_menu(
+#         rich_menu_request=RichMenuRequest.from_json(firebaseService.get_data(
+#                 DatabaseCollectionMap.RICH_MENU,
+#                 DatabaseDocumentMap.RICH_MENU.get('a')
+#         ).get('richmenu'))
+#     ).rich_menu_id
+#     line_bot_api.get_rich_menu('a')
+#     line_bot_api.get_rich_menu_list()
+#     line_bot_api.set_default_rich_menu('a')
+#     line_bot_api.delete_rich_menu('a')
+#     # CRUD of rich menu alias
+#     line_bot_api.create_rich_menu_alias(
+#         CreateRichMenuAliasRequest(
+#             richMenuAliasId='page1',
+#             richMenuId='a'
+#         )
+#     )
+#     line_bot_api.get_rich_menu_alias('page1')
+#     line_bot_api.get_rich_menu_alias_list()
+#     line_bot_api.update_rich_menu_alias(
+#         'page1',
+#         CreateRichMenuAliasRequest(richMenuAliasId='page1', richMenuId='a')
+#     )
+#     line_bot_api.delete_rich_menu_alias('page1')
+#     # CRUD of rich menu image
+#     line_bot_api_blob.get_rich_menu_image('a')
+#     response = requests.get(firebaseService.get_data(
+#         DatabaseCollectionMap.RICH_MENU,
+#         DatabaseDocumentMap.RICH_MENU.get('a')
+#     ).get('image_url'))
+#     image_content = response.content
+#     headers = {'Content-Type': 'image/png'}
+#     line_bot_api_blob.set_rich_menu_image(
+#         rich_menu_id='richmenu-c88b6b533abd76ac9068cf5296720e60',
+#         body=image_content,
+#         _headers=headers
+#     )
     
 class QuickReplyHelper:
     @staticmethod
