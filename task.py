@@ -439,15 +439,22 @@ class Quiz(Task):
         question_no = params.get('no')
         if question_no:
             question_no = int(question_no)
-            # 使用者的答案
-            answer = params.get('answer').lower()
-
             # 從temp取得題目
             temp_data = firebaseService.get_data('temp', user_id)
+            quiz_id = params.get('quiz_id')
+            
+            # 防止點選之前的測驗
+            if not temp_data or quiz_id != temp_data.get('quiz_id'):
+                return LineBotHelper.reply_message(event, [TextMessage(text='該測驗已結束！')])
+
+            # 防止重複作答
+            if question_no < temp_data.get('no'):
+                return LineBotHelper.reply_message(event, [TextMessage(text='請勿重複作答')])
+            
             quiz_questions = temp_data.get('questions')
-            if not quiz_questions:
-                LineBotHelper.reply_message(event, [TextMessage(text='若要進行測驗，請重新點選知識測驗！')])
-                return
+            
+            # 使用者的答案
+            answer = params.get('answer').lower()
 
             # 判斷答案是否正確
             last_quiz_question = quiz_questions[question_no - 1]
@@ -460,7 +467,7 @@ class Quiz(Task):
                 temp_data['correct_amount'] += 1
 
             if question_no < temp_data.get('question_amount'):
-                question_line_flex_str = __class__.__generate_question_line_flex(quiz_questions[question_no], question_no)
+                question_line_flex_str = __class__.__generate_question_line_flex(quiz_questions[question_no], quiz_id, question_no)
                 firebaseService.update_data('temp', user_id, {'no': question_no + 1, 'correct_amount': temp_data.get('correct_amount')})
                 LineBotHelper.reply_message(event, [
                     FlexMessage(alt_text='測驗解答', contents=FlexContainer.from_json(answer_line_flex_str)),
@@ -470,6 +477,8 @@ class Quiz(Task):
             else:
                 # 生成測驗結果
                 data = {
+                    'mode': temp_data.get('mode'),
+                    'category': temp_data.get('category'),
                     'quiz_id': temp_data.get('quiz_id'),
                     'correct_amount': temp_data.get('correct_amount'),
                     'total_amount': temp_data.get('question_amount')
@@ -491,18 +500,20 @@ class Quiz(Task):
                     questions = spreadsheetService.get_worksheet_data('quiz')
                     questions = [question for question in questions if question.get('category') == category]
                     quiz_questions = random.sample(questions, __class__.QUESTION_AMOUNT)
+                    quiz_id = LineBotHelper.generate_id()
                     data = {
                         'task': 'quiz',
+                        'mode': mode,
                         'category': category,
                         'no': 1,
                         'questions': quiz_questions,
                         'question_amount': __class__.QUESTION_AMOUNT,
                         'correct_amount': 0,
-                        'quiz_id': LineBotHelper.generate_id()
+                        'quiz_id': quiz_id
                     }
                     firebaseService.add_data(DatabaseCollectionMap.TEMP, user_id, data)
 
-                    line_flex_str = __class__.__generate_question_line_flex(quiz_questions[0], 0)
+                    line_flex_str = __class__.__generate_question_line_flex(quiz_questions[0], quiz_id, 0)
                     LineBotHelper.reply_message(event, [FlexMessage(alt_text='測驗題目', contents=FlexContainer.from_json(line_flex_str))])
                     return
                 else:
@@ -515,7 +526,7 @@ class Quiz(Task):
                 pass
             
     
-    def __generate_question_line_flex(question: dict, question_no: int):
+    def __generate_question_line_flex(question: dict, quiz_id: str, question_no: int):
         """Returns
         生成題目的Line Flex
         """
@@ -523,6 +534,7 @@ class Quiz(Task):
         gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
 
         question.update({
+            'quiz_id': quiz_id,
             'no': question_no + 1,
             'width': (100 // __class__.QUESTION_AMOUNT) * question_no
         })
