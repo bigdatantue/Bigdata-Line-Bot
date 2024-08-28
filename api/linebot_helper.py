@@ -7,6 +7,11 @@ from linebot.v3.messaging import (
     MessagingApiBlob,
     ReplyMessageRequest,
     MulticastRequest,
+    NarrowcastRequest,
+    AudienceRecipient,
+    OperatorRecipient,
+    RedeliveryRecipient,
+    Filter,
     PushMessageRequest,
     RichMenuRequest,
     URIAction,
@@ -90,7 +95,23 @@ class LineBotHelper:
                     messages=messages
                 )
             )
-    
+            
+    @staticmethod
+    def narrowcast_message(audience_group_id: int, messages):
+        """
+        推播多則訊息給特定受眾
+        """
+        recipient = AudienceRecipient(audience_group_id=audience_group_id)
+
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.narrowcast_with_http_info(
+                NarrowcastRequest(
+                    recipient=recipient,
+                    messages=messages
+                )
+            )
+   
     @staticmethod
     def generate_id(k: int=20):
         """

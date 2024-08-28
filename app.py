@@ -2,6 +2,7 @@ from config import Config
 from strategy import TaskStrategy, TemplateStrategy
 from map import Map, FeatureStatus, Permission
 from api.linebot_helper import LineBotHelper
+from audience import AudienceService
 from flask import Flask, request, abort
 from line_notify_app import line_notify_app
 from linebot.v3.exceptions import (
