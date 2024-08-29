@@ -98,19 +98,6 @@ class LineBotHelper:
         """
         CHARS='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
         return ''.join(random.choices(CHARS, k=k))
-
-    @staticmethod
-    def map_params(item: dict, map: dict):
-        """Returns 根據 map 的 value 對應 item 的 value 重新生成 { map的key: 對應item產生的值 } 的字典
-        dict: 對應後的參數 { flex message上設定的變數名稱: 要替換的資料值 }
-        """
-        params = {}
-        for key, value in map.items():
-            if callable(value):
-                params[key] = value(item)
-            else:
-                params[key] = item.get(value)
-        return params
         
     @staticmethod
     def replace_variable(text: str, variable_dict: dict, max_count: int = 0):
@@ -266,7 +253,7 @@ class QuickReplyHelper:
     
 class FlexMessageHelper:
     @staticmethod
-    def create_carousel_bubbles(items: list[dict], line_flex_json: json, params_map: dict = None):
+    def create_carousel_bubbles(items: list[dict], line_flex_json: json):
         """ Returns 根據 items 生成並替換 carousel bubbles的變數
         json: carousel bubbles
         """
@@ -274,9 +261,8 @@ class FlexMessageHelper:
         for item in items:
             # 複製原始的 bubble
             new_bubble = line_flex_json['contents'][0].copy()
-            item_params = LineBotHelper.map_params(item, params_map)
             # 在新 bubble 中進行變數替換
-            new_bubble = LineBotHelper.replace_variable(json.dumps(new_bubble), item_params)
+            new_bubble = LineBotHelper.replace_variable(json.dumps(new_bubble), item)
             
             # 將新 bubble 添加到 bubbles 中
             bubbles.append(json.loads(new_bubble))
