@@ -1,5 +1,5 @@
 from config import Config
-from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, FlexParamMap, EquipmentStatus, Permission
+from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, EquipmentStatus, Permission
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
@@ -58,8 +58,7 @@ class Course(Task):
                 DatabaseCollectionMap.LINE_FLEX,
                 DatabaseDocumentMap.LINE_FLEX.get("course")
             ).get('detail')
-            params = LineBotHelper.map_params(course, FlexParamMap.COURSE)
-            line_flex_str = LineBotHelper.replace_variable(line_flex_template, params)
+            line_flex_str = LineBotHelper.replace_variable(line_flex_template, course)
             
             LineBotHelper.reply_message(event, [FlexMessage(alt_text='詳細說明', contents=FlexContainer.from_json(line_flex_str))])
             return
@@ -81,7 +80,7 @@ class Course(Task):
                     DatabaseCollectionMap.LINE_FLEX, 
                     DatabaseDocumentMap.LINE_FLEX.get("course")
                 ).get('summary')
-                line_flex_json = FlexMessageHelper.create_carousel_bubbles(courses, json.loads(line_flex_template), FlexParamMap.COURSE)
+                line_flex_json = FlexMessageHelper.create_carousel_bubbles(courses, json.loads(line_flex_template))
                 line_flex_str = json.dumps(line_flex_json)
                 LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=FlexContainer.from_json(line_flex_str))])
             return
@@ -131,7 +130,7 @@ class Communtity(Task):
             DatabaseCollectionMap.LINE_FLEX,
             DatabaseDocumentMap.LINE_FLEX.get("community")
         ).get("microcourse")
-        line_flex_json = FlexMessageHelper.create_carousel_bubbles(microcourses, json.loads(line_flex_template), FlexParamMap.COMMUNITY)
+        line_flex_json = FlexMessageHelper.create_carousel_bubbles(microcourses, json.loads(line_flex_template))
         line_flex_str = json.dumps(line_flex_json)
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='社群學習資源', contents=FlexContainer.from_json(line_flex_str))])
         return
@@ -191,7 +190,7 @@ class Equipment(Task):
                     DatabaseCollectionMap.LINE_FLEX,
                     DatabaseDocumentMap.LINE_FLEX.get("equipment")
                 ).get("record")
-                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template))
                 line_flex_str = json.dumps(line_flex_json)
                 LineBotHelper.reply_message(event, [TextMessage(text='設備租借核准'), FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
                 LineBotHelper.push_message(borrower_user_id, [TextMessage(text='設備租借核准'), FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
@@ -322,7 +321,7 @@ class Equipment(Task):
                         DatabaseCollectionMap.LINE_FLEX,
                         DatabaseDocumentMap.LINE_FLEX.get("equipment")
                     ).get("equipment_summary")
-                    line_flex_template = FlexMessageHelper.create_carousel_bubbles(equipments, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                    line_flex_template = FlexMessageHelper.create_carousel_bubbles(equipments, json.loads(line_flex_template))
                     line_flex_template = json.dumps(line_flex_template)
                     return LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_template))])
             else:
@@ -335,7 +334,7 @@ class Equipment(Task):
                     DatabaseCollectionMap.LINE_FLEX,
                     DatabaseDocumentMap.LINE_FLEX.get("equipment")
                 ).get("record")
-                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template), FlexParamMap.EQUIPMENT)
+                line_flex_json = FlexMessageHelper.create_carousel_bubbles(borrow_records, json.loads(line_flex_template))
                 line_flex_str = json.dumps(line_flex_json)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
 
