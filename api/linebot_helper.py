@@ -16,7 +16,8 @@ from linebot.v3.messaging import (
     CreateRichMenuAliasRequest,
     QuickReply,
     QuickReplyItem,
-    ShowLoadingAnimationRequest
+    ShowLoadingAnimationRequest,
+    ValidateMessageRequest
 )
 import requests
 import random
@@ -56,6 +57,8 @@ class LineBotHelper:
         """
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
+            # 為了避免回覆訊息時發生錯誤（通常是Flex string解析異常），先檢查訊息是否合法
+            line_bot_api.validate_reply(ValidateMessageRequest(messages=messages))
             line_bot_api.reply_message_with_http_info(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
