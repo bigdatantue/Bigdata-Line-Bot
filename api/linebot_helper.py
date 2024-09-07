@@ -22,6 +22,8 @@ import requests
 import random
 import json
 import re
+import pytz
+from datetime import datetime
 
 config = Config()
 configuration = config.configuration
@@ -31,7 +33,7 @@ class LineBotHelper:
     @staticmethod
     def get_user_info(user_id: str):
         """Returns 使用者資訊
-        list: [使用者名稱, 使用者大頭貼]
+        list: [使用者名稱, 使用者大頭貼, 使用者語系, 使用者狀態訊息]
         """
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
@@ -90,6 +92,26 @@ class LineBotHelper:
                     messages=messages
                 )
             )
+            
+    @staticmethod
+    def get_current_time():
+        """Returns
+        datetime: 現在時間
+        """
+        return datetime.now(pytz.timezone('Asia/Taipei'))
+    
+    @staticmethod
+    def convert_timedelta_to_string(timedelta):
+        """Returns
+        str: 時間字串 (小時:分鐘:秒 e.g. 01:20:43)
+        """
+        hours = timedelta.days * 24 + timedelta.seconds // 3600
+        minutes = (timedelta.seconds % 3600) // 60
+        seconds = timedelta.seconds % 60
+        hours = hours if len(str(hours)) >= 2 else f'0{hours}'
+        minutes = minutes if len(str(minutes)) == 2 else f'0{minutes}'
+        seconds = seconds if len(str(seconds)) == 2 else f'0{seconds}'
+        return f'{hours}:{minutes}:{seconds}'
     
     @staticmethod
     def generate_id(k: int=20):
