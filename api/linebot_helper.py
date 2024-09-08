@@ -126,16 +126,25 @@ class LineBotHelper:
         
     @staticmethod
     def replace_variable(text: str, variable_dict: dict, max_count: int = 0):
-        """Returns 取代變數後的文字 e.g. {{semester}} -> 代表semester是一個變數，取代成variable_dict中key為semester的值
+        """Returns 取代變數後的文字 e.g. {{semester}} -> 代表semester是一個變數，取代成variable_dict中key為semester的值(max_count為相同變數取代次數)
         str: 取代變數後的文字
         """
+        replaced_count = {}
+
         def replace(match):
             key = match.group(1)
+            if max_count:
+                if key not in replaced_count:
+                    replaced_count[key] = 1
+                else:
+                    replaced_count[key] += 1
+                    if replaced_count[key] > max_count:
+                        return match.group(0)
             return str(variable_dict.get(key, match.group(0)))
 
         # 匹配 {{variable}} 的正規表達式
         pattern = r'\{\{([a-zA-Z0-9_]*)\}\}'
-        replaced_text = re.sub(pattern, replace, text, count=max_count)
+        replaced_text = re.sub(pattern, replace, text)
         return replaced_text
     
     @staticmethod
