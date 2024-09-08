@@ -494,9 +494,13 @@ class Quiz(Task):
             # 進行測驗
             mode = params.get('mode')
             category = params.get('category')
+            competition_id = params.get('competition_id')
             quiz_flex_datas = spreadsheetService.get_worksheet_data('quizzes')
+            if mode == 'rank':
+                # 排行榜
+                rank_line_flex_str = __class__.__generate_rank_line_flex(competition_id, user_id)
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='排行榜', contents=FlexContainer.from_json(rank_line_flex_str))])
             if category:
-                competition_id = params.get('competition_id')
                 quiz_id = LineBotHelper.generate_id()
                 current_time = LineBotHelper.get_current_time().strftime('%Y-%m-%d %H:%M:%S')
                 if mode == 'competition':
@@ -536,10 +540,12 @@ class Quiz(Task):
                 line_flex_str = __class__.__generate_question_line_flex(quiz_questions[0], quiz_id, 0, question_amount)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='測驗題目', contents=FlexContainer.from_json(line_flex_str))])
             else:
-                line_flex_template = firebaseService.get_data(
+                line_flex_data = firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
                     DatabaseDocumentMap.LINE_FLEX.get("quiz")
-                ).get('select')
+                )
+                line_flex_template = line_flex_data.get('general_select') if mode == 'general' else line_flex_data.get('competition_select')
+
                 quiz_flex_data = [quiz for quiz in quiz_flex_datas if quiz.get('enable') and quiz.get('mode') == mode]
                 if len(quiz_flex_data) == 0:
                     # 確認選擇的測驗類別是否有開放
@@ -693,3 +699,89 @@ class Quiz(Task):
         start_time = taiwan_tz.localize(datetime.strptime(start_time, '%Y-%m-%d %H:%M'))
         end_time = taiwan_tz.localize(datetime.strptime(end_time, '%Y-%m-%d %H:%M'))
         return current_time >= start_time and current_time <= end_time
+    
+    def __generate_rank_line_flex(competition_id: str, user_id: str):
+        """
+        生成排行榜的Line Flex
+        """
+        def format_time_spent_str(time_spent: str):
+            """Returns
+            str: 格式化後的時間(只留mm:ss, 超過59:59則回傳>59:59)
+            """
+            if time_spent.split(':')[0] == '0':
+                return ':'.join(time_spent.split(':')[1:])
+            return '>59:59'
+        
+        def get_user_data(user_info: list, user_id: str):
+            """Returns
+            dict: 使用者資料
+            """
+            info = [info for info in user_info if info.get('user_id') == user_id][0]
+            return {
+                'mode': 'competition',
+                'user_display_name': info.get('display_name'),
+                'user_picture_url': info.get('picture_url'),
+                'user_rank': '-',
+                'user_correct_rate': '-',
+                'user_time_spent': '-',
+            }
+        
+        user_info = spreadsheetService.get_worksheet_data('user_info')
+        competions = spreadsheetService.get_worksheet_data('competitions')
+        competition = [competition for competition in competions if competition.get('competition_id') == competition_id]
+        merged_data = []
+        data = {}
+        if len(competition) == 0:
+            # 還未有人參賽
+            data = get_user_data(user_info, user_id)
+        else:
+            merged_data_df = pd.merge(pd.DataFrame(user_info), pd.DataFrame(competition), on='user_id')
+
+            # 依照正確率、答題時間排序進行排名
+            merged_data_df['rank'] = merged_data_df[['correct_amount', 'time_spent']].apply(
+                lambda x: (-x['correct_amount'], x['time_spent']), axis=1
+            ).rank(method='min').astype(int)
+            merged_data_df = merged_data_df.sort_values(by='rank', ascending=True, ignore_index=True)
+            merged_data = merged_data_df.to_dict(orient='records')
+            user_competition = [data for data in merged_data if data.get('user_id') == user_id]
+            
+            if len(user_competition) == 0:
+                # 使用者未參賽
+                data = get_user_data(user_info, user_id)
+            else:
+                # 使用者已參賽
+                user_competition = user_competition[0]
+                user_time_spent = format_time_spent_str(user_competition.get('time_spent'))
+                data = {
+                    'mode': 'competition',
+                    'user_display_name': user_competition.get('display_name'),
+                    'user_picture_url': user_competition.get('picture_url'),
+                    'user_rank': user_competition.get('rank'),
+                    'user_correct_rate': round(int(user_competition.get('correct_amount')) / int(user_competition.get('question_amount')) * 100),
+                    'user_time_spent': user_time_spent,
+                }
+
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        ).get('rank')
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
+
+        # 生成排行榜前5名
+        for i in range(5):
+            # 若前五名有資料則顯示，否則顯示'-'
+            if len(merged_data) >= i + 1:
+                merged_data[i]['correct_rate'] = round(int(merged_data[i].get('correct_amount')) / int(merged_data[i].get('question_amount')) * 100)
+                merged_data[i]['time_spent'] = format_time_spent_str(merged_data[i].get('time_spent'))
+                line_flex_str = LineBotHelper.replace_variable(line_flex_str, merged_data[i], 1)
+            else:
+                data = {
+                    'rank': '-',
+                    'display_name': '-',
+                    'picture_url': 'https://example.com/default.png',
+                    'correct_rate': '-',
+                    'time_spent': '-'
+                }
+                line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
+                break
+        return line_flex_str
