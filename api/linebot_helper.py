@@ -16,12 +16,15 @@ from linebot.v3.messaging import (
     CreateRichMenuAliasRequest,
     QuickReply,
     QuickReplyItem,
-    ShowLoadingAnimationRequest
+    ShowLoadingAnimationRequest,
+    ValidateMessageRequest
 )
 import requests
 import random
 import json
 import re
+import pytz
+from datetime import datetime
 
 config = Config()
 configuration = config.configuration
@@ -31,12 +34,12 @@ class LineBotHelper:
     @staticmethod
     def get_user_info(user_id: str):
         """Returns 使用者資訊
-        list: [使用者名稱, 使用者大頭貼]
+        list: [使用者名稱, 使用者大頭貼, 使用者語系, 使用者狀態訊息]
         """
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
             user_info = line_bot_api.get_profile(user_id)
-            return [user_info.display_name, user_info.picture_url]
+            return [user_info.display_name, user_info.picture_url, user_info.language, user_info.status_message]
 
     @staticmethod
     def show_loading_animation_(event, time: int=10):
@@ -56,6 +59,8 @@ class LineBotHelper:
         """
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
+            # 為了避免回覆訊息時發生錯誤（通常是Flex string解析異常），先檢查訊息是否合法
+            line_bot_api.validate_reply(ValidateMessageRequest(messages=messages))
             line_bot_api.reply_message_with_http_info(
                 ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -90,6 +95,26 @@ class LineBotHelper:
                     messages=messages
                 )
             )
+            
+    @staticmethod
+    def get_current_time():
+        """Returns
+        datetime: 現在時間
+        """
+        return datetime.now(pytz.timezone('Asia/Taipei'))
+    
+    @staticmethod
+    def convert_timedelta_to_string(timedelta):
+        """Returns
+        str: 時間字串 (小時:分鐘:秒 e.g. 01:20:43)
+        """
+        hours = timedelta.days * 24 + timedelta.seconds // 3600
+        minutes = (timedelta.seconds % 3600) // 60
+        seconds = timedelta.seconds % 60
+        hours = hours if len(str(hours)) >= 2 else f'0{hours}'
+        minutes = minutes if len(str(minutes)) == 2 else f'0{minutes}'
+        seconds = seconds if len(str(seconds)) == 2 else f'0{seconds}'
+        return f'{hours}:{minutes}:{seconds}'
     
     @staticmethod
     def generate_id(k: int=20):
@@ -98,27 +123,23 @@ class LineBotHelper:
         """
         CHARS='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
         return ''.join(random.choices(CHARS, k=k))
-
-    @staticmethod
-    def map_params(item: dict, map: dict):
-        """Returns 根據 map 的 value 對應 item 的 value 重新生成 { map的key: 對應item產生的值 } 的字典
-        dict: 對應後的參數 { flex message上設定的變數名稱: 要替換的資料值 }
-        """
-        params = {}
-        for key, value in map.items():
-            if callable(value):
-                params[key] = value(item)
-            else:
-                params[key] = item.get(value)
-        return params
         
     @staticmethod
-    def replace_variable(text: str, variable_dict: dict):
-        """Returns 取代變數後的文字 e.g. {{semester}} -> 代表semester是一個變數，取代成variable_dict中key為semester的值
+    def replace_variable(text: str, variable_dict: dict, max_count: int = 0):
+        """Returns 取代變數後的文字 e.g. {{semester}} -> 代表semester是一個變數，取代成variable_dict中key為semester的值(max_count為相同變數取代次數)
         str: 取代變數後的文字
         """
+        replaced_count = {}
+
         def replace(match):
             key = match.group(1)
+            if max_count:
+                if key not in replaced_count:
+                    replaced_count[key] = 1
+                else:
+                    replaced_count[key] += 1
+                    if replaced_count[key] > max_count:
+                        return match.group(0)
             return str(variable_dict.get(key, match.group(0)))
 
         # 匹配 {{variable}} 的正規表達式
@@ -266,7 +287,7 @@ class QuickReplyHelper:
     
 class FlexMessageHelper:
     @staticmethod
-    def create_carousel_bubbles(items: list[dict], line_flex_json: json, params_map: dict = None):
+    def create_carousel_bubbles(items: list[dict], line_flex_json: json):
         """ Returns 根據 items 生成並替換 carousel bubbles的變數
         json: carousel bubbles
         """
@@ -274,9 +295,8 @@ class FlexMessageHelper:
         for item in items:
             # 複製原始的 bubble
             new_bubble = line_flex_json['contents'][0].copy()
-            item_params = LineBotHelper.map_params(item, params_map)
             # 在新 bubble 中進行變數替換
-            new_bubble = LineBotHelper.replace_variable(json.dumps(new_bubble), item_params)
+            new_bubble = LineBotHelper.replace_variable(json.dumps(new_bubble), item)
             
             # 將新 bubble 添加到 bubbles 中
             bubbles.append(json.loads(new_bubble))

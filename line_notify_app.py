@@ -37,7 +37,7 @@ def line_notify():
     # 若使用者已存在，代表先前已經連動過，需先刪除再新增
     if spreadsheetService.check_user_exists('notify_info', user_id):
         wks = spreadsheetService.sh.worksheet_by_title('notify_info')
-        user_row_index = spreadsheetService.get_user_row_index(wks, user_id)
+        user_row_index = spreadsheetService.get_row_index(wks, 'user_id', user_id)
         spreadsheetService.delete_row_data('notify_info', user_row_index)
     spreadsheetService.add_user('notify_info', user_info)
     msg = "感謝您連動「國北教大教育大數據微學程」Line Notify 推播服務，若未來您想解除連動，請點選 https://notify-bot.line.me/my/ 後將連動解除即可。"
