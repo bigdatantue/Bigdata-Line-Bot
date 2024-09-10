@@ -500,6 +500,8 @@ class Quiz(Task):
                 # 排行榜
                 rank_line_flex_str = __class__.__generate_rank_line_flex(competition_id, user_id)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='排行榜', contents=FlexContainer.from_json(rank_line_flex_str))])
+            elif mode == 'history':
+                return LineBotHelper.reply_message(event, [TextMessage(text='敬請期待')])            
             if category:
                 quiz_id = LineBotHelper.generate_id()
                 current_time = LineBotHelper.get_current_time().strftime('%Y-%m-%d %H:%M:%S')
@@ -725,7 +727,21 @@ class Quiz(Task):
                 'user_correct_rate': '-',
                 'user_time_spent': '-',
             }
-        
+            
+        def generate_mask(display_name: str):
+            """Returns
+            str: 隱藏使用者名稱
+            """
+            if len(display_name) == 1:
+                display_name = '*'
+            elif len(display_name) == 2:
+                display_name = display_name[0] + '*'
+            elif len(display_name) == 3:
+                display_name = display_name[0] + '*' + display_name[-1]
+            else:
+                display_name = display_name[0] + '**' + display_name[-1]
+            return display_name
+
         user_info = spreadsheetService.get_worksheet_data('user_info')
         competions = spreadsheetService.get_worksheet_data('competitions')
         competition = [competition for competition in competions if competition.get('competition_id') == competition_id]
@@ -772,6 +788,7 @@ class Quiz(Task):
             # 若前五名有資料則顯示，否則顯示'-'
             if len(merged_data) >= i + 1:
                 merged_data[i]['correct_rate'] = round(int(merged_data[i].get('correct_amount')) / int(merged_data[i].get('question_amount')) * 100)
+                merged_data[i]['display_name'] = generate_mask(merged_data[i].get('display_name'))
                 merged_data[i]['time_spent'] = format_time_spent_str(merged_data[i].get('time_spent'))
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, merged_data[i], 1)
             else:

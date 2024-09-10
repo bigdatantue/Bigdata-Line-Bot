@@ -30,7 +30,7 @@ class TestQuiz(unittest.TestCase):
             print(f"Testing quiz question {idx + 1}, question_id: {quiz_question['id']}")
             
             # 使用反射調用private method
-            line_flex_str = Quiz._Quiz__generate_question_line_flex(quiz_question, "quiz_id", idx)
+            line_flex_str = Quiz._Quiz__generate_question_line_flex(quiz_question, "quiz_id", idx, 5)
 
             with ApiClient(self.configuration) as api_client:
                 line_bot_api = MessagingApi(api_client)
@@ -46,7 +46,7 @@ class TestQuiz(unittest.TestCase):
         測試生成答案的FlexMessage
         """
         quiz_questions = self.spreadsheetService.get_worksheet_data('quiz_questions')
-        quiz_questions = [question for question in quiz_questions if question['category'] == 'linebot']
+        # quiz_questions = [question for question in quiz_questions if question['category'] == 'linebot']
         for idx, quiz_question in enumerate(quiz_questions):
             print(f"Testing quiz question {idx + 1}, question_id: {quiz_question['id']}")
             
