@@ -62,7 +62,7 @@ class Config(metaclass=Singleton):
     def feature_init(self):
         self.feature = {
             'menu': FeatureStatus.ENABLE,
-            'setting': FeatureStatus.DISABLE,
+            'setting': FeatureStatus.ENABLE,
             'faq': FeatureStatus.DISABLE,
             'course': FeatureStatus.ENABLE,
             'certificate': FeatureStatus.ENABLE,
