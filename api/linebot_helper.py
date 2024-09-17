@@ -42,6 +42,16 @@ class LineBotHelper:
             return [user_info.display_name, user_info.picture_url, user_info.language, user_info.status_message]
 
     @staticmethod
+    def check_is_fixing():
+        """Returns 
+        bool: 是否維修中
+        """
+        return firebaseService.get_data(
+            DatabaseCollectionMap.CONFIG,
+            DatabaseDocumentMap.CONFIG.get('system')
+        ).get('fixing', False)
+
+    @staticmethod
     def show_loading_animation_(event, time: int=10):
         """
         顯示載入動畫

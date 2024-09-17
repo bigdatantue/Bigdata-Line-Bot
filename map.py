@@ -76,6 +76,7 @@ class DatabaseCollectionMap:
     """
     Map資料庫Collection名稱
     """
+    CONFIG = "config"
     RICH_MENU = "rich_menu"
     LINE_FLEX = "line_flex"
     QUICK_REPLY = "quick_reply"
@@ -85,6 +86,9 @@ class DatabaseDocumentMap:
     """
     Map資料庫Document名稱
     """
+    CONFIG = {
+        "system": "system"
+    }
     RICH_MENU = {
         "a": "page1",
         "b": "page2"

@@ -100,6 +100,8 @@ def handle_message(event):
     Handle文字訊息事件
     """
     try:
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         # 取得使用者文字訊息
         user_msg = event.message.text
         user_id = event.source.user_id
@@ -144,6 +146,8 @@ def handle_postback(event):
     Handle Postback事件
     """
     try:
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         postback_data = event.postback.data
         if 'richmenu' in postback_data:
             return
