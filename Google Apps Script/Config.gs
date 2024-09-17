@@ -18,19 +18,3 @@ function onOpen(e) {
     .addItem("移除「可刪除」訂閱者", "deleteUsers")
     .addToUi();
 }
-
-// 更新使用者資訊
-function updateUserInfo() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('user_info');
-  var lastRow = sheet.getLastRow();
-  for (var i = 2; i <= lastRow; i++) {
-    var userId = sheet.getRange(i, getColumnIndex('user_info', 'user_id')).getValue();
-    var newUserInfo = getUserInfo(userId);
-    if (newUserInfo) {
-      sheet.getRange(i, getColumnIndex('user_info', 'display_name')).setValue(newUserInfo.displayName);
-      sheet.getRange(i, getColumnIndex('user_info', 'picture_url')).setValue(newUserInfo.pictureUrl);
-      sheet.getRange(i, getColumnIndex('user_info', 'language')).setValue(newUserInfo.language);
-      sheet.getRange(i, getColumnIndex('user_info', 'status_message')).setValue(newUserInfo.statusMessage);
-    }
-  }
-}
