@@ -55,7 +55,6 @@ class Map:
         '開課時間查詢': 'course',
         '證書申請流程': 'certificate',
         '社群學習資源': 'community',
-        '線上輔導+實體預約': 'counseling',
         '設備租借': 'equipment',
         '計畫成果展示': 'gallery',
         '知識測驗': 'quiz'
@@ -98,7 +97,6 @@ class DatabaseDocumentMap:
         "course": "course",
         "certificate": "certificate",
         "community": "community",
-        "counseling": "counseling",
         "equipment": "equipment",
         "quiz": "quiz"
     }
