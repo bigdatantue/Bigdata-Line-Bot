@@ -1,112 +1,195 @@
 {% extends "base.html" %}
-{% block title %}使用者資訊表單{% endblock %}
+{% block title %}個人資料{% endblock %}
 {% block content %}
-<h1>測試</h1>
-<div class="row" style="margin: 10px">
-    <div class="col-12" style="margin: 10px">
-        <label>借用人姓名:
-        </label>
-        <input type="text" id="name" class="form-control" />
-        <br />
-        <label>手機:
-        </label>
-        <input type="text" id="phone" class="form-control" />
-        <br />
-        <label>Email:</label>
-        <input type="email" id="email" class="form-control" />
-        <br />
-        <label> 租用人身分:</label>
-        <select id="identity" class="form-control">
-            <option value="1">個人(學生)</option>
-            <option value="2">個人(教師)</option>
-            <option value="3">團體(師或生)</option>
-        </select>
-        <br />
-        <button class="btn btn-success btn-block" id="sure">確定</button>
+<form class="needs-validation" novalidate>
+    <h4>一、基本資料</h4>
+    <div class="row g-3" style="margin: 10px">
+        <div class="col-md-6">
+            <label for="name" class="form-label">姓名</label>
+            <input type="text" id="name" class="form-control" value="{{ user_info.name }}" required>
+            <div class="invalid-feedback">
+                姓名欄位必填
+            </div>
+        </div>
+        <div class="col-md-6">
+            <label for="studentId" class="form-label">學號</label>
+            <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required>
+            <div class="invalid-feedback">
+                學號欄位必填或格式錯誤
+            </div>
+        </div>
+        <div class="col-md-6">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" class="form-control" value="{{ user_info.email }}" required>
+            <div class="invalid-feedback">
+                Email欄位必填
+            </div>
+        </div>
+        <div class="col-md-6">
+            <label for="phone" class="form-label">手機</label>
+            <input type="text" id="phone" class="form-control" value="{{ user_info.phone }}" maxlength="10">
+        </div>
+        <div class="invalid-feedback">
+            手機格式錯誤
+        </div>
     </div>
-</div>
+    <br>
+    <h4>二、系級</h4>
+    <div class="row g-3" style="margin: 10px">
+        <div class="col-md-4">
+            <label for="college" class="form-label">所屬學院</label>
+            <select id="college" class="form-select" required>
+                <option value="" selected disabled>請選擇學院</option>
+                <option value="教育學院">教育學院</option>
+                <option value="理學院">理學院</option>
+                <option value="人文藝術學院">人文藝術學院</option>
+                <option value="國際學位學程">國際學位學程</option>
+            </select>
+            <div class="invalid-feedback">
+                學院欄位必填
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label for="department" class="form-label">系所</label>
+            <select id="department" class="form-select" required>
+                <option value="" selected disabled>請選擇系所</option>
+            </select>
+            <div class="invalid-feedback">
+                系所欄位必填
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label for="grade" class="form-label">年級</label>
+            <select id="grade" class="form-select" required>
+                <option value="" selected disabled>請選擇年級</option>
+                <option value="大一">大一</option>
+                <option value="大二">大二</option>
+                <option value="大三">大三</option>
+                <option value="大四">大四</option>
+                <option value="碩士班">碩士班</option>
+                <option value="博士班">博士班</option>
+            </select>
+            <div class="invalid-feedback">
+                年級欄位必填
+            </div>
+        </div>
+    </div>
+    <div class="row" style="margin: 10px">
+        <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-success" id="submitBtn">送出</button>
+            <button class="btn btn-success" id="loadBtn" type="button" disabled style="display: none;">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="vertical-align: baseline;"></span>
+                處理中...
+            </button>
+        </div>
+    </div>
+</form>
 
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
-    var user_id;
-    var name;
-    var picUrl;
-    function initializeLiff(liffId) {
-        liff.init({
-            liffId: liffId
-        }).then(() => {
-            if (!liff.isLoggedIn()) {
-                // alert("用戶未登入");
-                liff.login();
-            } else {
-                // alert("用戶已登入");
-                liff.getProfile()
-                    .then(profile => {
-                        name = profile.displayName;
-                        userId = profile.userId;
-                        picUrl = profile.pictureUrl;
-                    })
-                    .catch((err) => {
-                        console.log('error', err);
-                    });
-            }
-        }).catch((err) => {
-            console.log('初始化失敗', err);
-        });
+    const colleges = {
+        "教育學院": ["課傳與教學傳播科技所", "教育經營與管理所", "教育系", "幼兒與家庭教育所", "特教系", "心理諮商系", "社會與區域發展學系"],
+        "理學院": ["數學暨資訊教育學系", "資訊科學系", "體育學系", "自然科學教育學系", "數位科技設計學系"],
+        "人文藝術學院": ["語文創作系", "兒童英語創作系", "藝術與造型設計學系", "台灣文化研究所", "音樂系", "文化創意產業經營系"],
+        "國際學位學程": ["當代藝術評論與策展研究全英語碩士學程", "學習與教學國際碩士學位學程", "東南亞區域管理碩士學位學程"]
     }
+    let userId;
+
+    $(document).ready(function () {
+        initializeLiff('{{ liff_id }}');
+
+        // 初始化下拉選單
+        $('#college').val('{{ user_info.college }}');
+        updateDepartmentDropdown();
+        $('#department').val('{{ user_info.department }}');
+        $('#grade').val('{{ user_info.grade }}');
 
 
-    function pushMsg(data) {
-        for (var key in data) {
-            if (data[key] == '') {  //資料檢查
-                alert('每個項目都必須輸入！');
+        // 選擇學院時更新系所下拉選單
+        $('#college').change(function () {
+            if ($('#college').val() === '') {
+                $('#department').empty();
+                $('#department').append('<option value="" selected disabled>請選擇系所</option>');
                 return;
             }
-        }
-        var msg = "###";  //回傳訊息字串
-        for (var key in data) {
-            msg += key + ":" + data[key] + "\n";
-        }
-		liff.sendMessages([{ 
-            type: 'text',
-            text: msg
-        }])
-        // liff.sendMessages([{
-        //     type: 'flex',
-        //     altText: 'User Info',
-        //     contents: {
-        //         "type": "bubble",
-        //         "body": {
-        //             "type": "box",
-        //             "layout": "vertical",
-        //             "contents": [
-        //             {
-        //                 "type": "text",
-        //                 "text": "User Info",
-        //                 "weight": "bold",
-        //                 "size": "xl"
-        //             }
-        //             ]
-        //         }
-        //     }
-        // }])
-        .then(() => {
-            liff.closeWindow();  //關閉視窗
+            updateDepartmentDropdown();
         });
-    }
-         
 
-    $(document).ready(function () { 
-        initializeLiff('{{ liff_id }}');  //接收傳遞的 liffid 參數
-        $('#sure').click(function (e) {  //按下確定鈕
+        // 送出表單
+        $('form').submit(function (e) {
+            e.preventDefault();
+            // 驗證表單
+            if (!this.checkValidity()) {
+                e.stopPropagation();
+                $(this).addClass('was-validated');
+                return;
+            }
+            $('#submitBtn').hide();
+            $('#loadBtn').show();
             data = {
-                'name': $('#name').val(),
-                'phone': $('#phone').val(),
-                'email': $('#email').val(),
-                'identity': $('#identity').val()
-            };
-            pushMsg(data);
+                userId: userId,
+                name: $('#name').val(),
+                studentId: $('#studentId').val(),
+                email: $('#email').val(),
+                phone: $('#phone').val(),
+                college: $('#college').val(),
+                department: $('#department').val(),
+                grade: $('#grade').val(),
+            }
+            $.ajax({
+                url: location.origin + "/liff/userinfo",
+                type: 'POST',
+                data: data,
+                success: function (response) {
+                    liff.sendMessages([{
+                        type: 'text',
+                        text: response.message
+                    }])
+                        .then(() => {
+                            liff.closeWindow();
+                        });
+                },
+                error: function (error) {
+                    console.log('error', error);
+                }
+            });
         });
+
+        // 初始化LIFF
+        function initializeLiff(liffId) {
+            liff.init({
+                liffId: liffId
+            }).then(() => {
+                if (!liff.isLoggedIn()) {
+                    // alert("用戶未登入");
+                    liff.login();
+                } else {
+                    // alert("用戶已登入");
+                    liff.getProfile()
+                        .then(profile => {
+                            userId = profile.userId;
+                        })
+                        .catch((err) => {
+                            console.log('error', err);
+                        });
+                }
+            }).catch((err) => {
+                console.log('初始化失敗', err);
+            });
+        }
+        
+        // 更新系所下拉選單
+        function updateDepartmentDropdown() {
+            let college = $('#college').val();
+            if (college) {
+                let department = colleges[college];
+                $('#department').empty();
+                $('#department').append('<option value="" selected disabled>請選擇系所</option>');
+                department.forEach(function (department) {
+                    $('#department').append('<option value="' + department + '">' + department + '</option>');
+                });
+            }
+        }
     });
 </script>
 {% endblock %}

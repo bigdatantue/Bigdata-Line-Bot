@@ -1,5 +1,5 @@
 from config import Config
-from map import DatabaseDocumentMap
+from map import DatabaseDocumentMap, LIFFSize
 from api.linebot_helper import LineBotHelper, QuickReplyHelper
 from linebot.v3.messaging import (
     TextMessage,
@@ -53,8 +53,9 @@ class Setting(Template):
     def execute(self, event, **kwargs):
         request = kwargs.get('request')
         line_flex_str = firebaseService.get_data('line_flex', 'setting').get('select')
-        register_url = request.url_root.replace('http', 'https') + 'notify/register?state=' + event.source.user_id
-        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {'register_url': register_url})
+        register_url = request.url_root.replace('http:', 'https:') + 'notify/register?state=' + event.source.user_id
+        userinfo_url = f'https://liff.line.me/{LIFFSize.TALL.value}/userinfo?userId={event.source.user_id}'
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {'register_url': register_url, 'userinfo_url': userinfo_url})
         return LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇設定項目', contents=FlexContainer.from_json(line_flex_str))])
         
 class Course(Template):

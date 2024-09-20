@@ -34,7 +34,7 @@ class SpreadsheetService:
         """
         column_index = self.get_column_index(wks, column_name)
         column_values = wks.get_col(column_index)
-        return column_values.index(value) + 1
+        return column_values.index(value) + 1 if value in column_values else None
         
     def set_user_status(self, user_id, is_active):
         """
