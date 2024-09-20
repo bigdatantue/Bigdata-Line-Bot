@@ -146,27 +146,6 @@ class Certificate(Task):
             image_url = 'https://bigdatalinebot.blob.core.windows.net/linebot/Micro-Credit-Course-Apply-Process.png'
             LineBotHelper.reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url)])
             return
-
-class Counseling(Task):
-    """
-    線上輔導+實體預約
-    """
-    def execute(self, event, params):
-        counseling_type = params.get('type')
-        if counseling_type == 'online':
-            line_flex_str = firebaseService.get_data(
-                DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling")
-            ).get("online")
-            LineBotHelper.reply_message(event, [FlexMessage(alt_text='線上輔導', contents=FlexContainer.from_json(line_flex_str))])
-            return
-        else:
-            line_flex_str = firebaseService.get_data(
-                DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling")
-            ).get("physical")
-            LineBotHelper.reply_message(event, [FlexMessage(alt_text='實體預約', contents=FlexContainer.from_json(line_flex_str))])
-            return
         
 class Equipment(Task):
     """
