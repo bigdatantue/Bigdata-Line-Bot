@@ -14,7 +14,7 @@ def line_notify_register():
     連動Line Notify頁面
     """
     client_id = lineNotifyService.client_id
-    redirect_uri = request.url_root.replace('http', 'https') + 'notify/callback'
+    redirect_uri = request.url_root.replace('http:', 'https:') + 'notify/callback'
     state = request.args.get('state')
     url = f'https://notify-bot.line.me/oauth/authorize?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&scope=notify&state={state}'
     return render_template('notify/register.html', **locals())
@@ -26,7 +26,7 @@ def line_notify():
     """
     authorizeCode = request.args.get('code')
     user_id = request.args.get('state')
-    redirect_uri = request.url_root.replace('http', 'https') + 'notify/callback'
+    redirect_uri = request.url_root.replace('http:', 'https:') + 'notify/callback'
     token = lineNotifyService.get_notify_token(authorizeCode, redirect_uri, lineNotifyService.client_id, lineNotifyService.client_secret)
     current_time = LineBotHelper.get_current_time().strftime('%Y-%m-%d %H:%M:%S')
     
