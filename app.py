@@ -107,7 +107,10 @@ def handle_message(event):
         # 取得使用者文字訊息
         user_msg = event.message.text
         user_id = event.source.user_id
-        feature = Map.FEATURE.get(user_msg)    
+        feature = Map.FEATURE.get(user_msg)
+        # 如果使用者輸入的文字為FAQ的文字，則設定功能為FAQ
+        if user_msg in Map.FAQ_SET:
+            feature = 'faq'
         temp = firebaseService.get_data('temp', user_id)
 
         # 判斷使用者輸入的文字是否為功能

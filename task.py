@@ -33,7 +33,8 @@ class TaskFactory:
             'certificate': Certificate,
             'counseling': Counseling,
             'equipment': Equipment,
-            'quiz': Quiz
+            'quiz': Quiz,
+            'faq': FAQ
         }
 
     def get_task(self, task_name):
@@ -781,3 +782,13 @@ class Quiz(Task):
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
                 break
         return line_flex_str
+
+class FAQ(Task):
+    """
+    常見問答
+    """
+    def execute(self, event, params):
+        id = params.get('id')
+        faq_questions = spreadsheetService.get_worksheet_data('faq_questions')
+        answer = [faq for faq in faq_questions if faq.get('id') == int(id)][0].get('answer')
+        return LineBotHelper.reply_message(event, [TextMessage(text=answer)])

@@ -1,14 +1,16 @@
 from config import Config
-from map import DatabaseDocumentMap, LIFFSize
-from api.linebot_helper import LineBotHelper, QuickReplyHelper
+from map import DatabaseDocumentMap, DatabaseCollectionMap, LIFFSize
+from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
     FlexMessage,
     FlexContainer
 )
 from abc import ABC, abstractmethod
+import json
 
 config = Config()
+spreadsheetService = config.spreadsheetService
 firebaseService = config.firebaseService
 
 class Template(ABC):
@@ -26,7 +28,8 @@ class TemplateFactory:
             'certificate': Certificate,
             'community': Communtity,
             'equipment': Equipment,
-            'quiz': Quiz
+            'quiz': Quiz,
+            'faq': FAQ
         }
 
     def get_template(self, task_name):
@@ -96,3 +99,30 @@ class Quiz(Template):
     def execute(self, event, **kwargs):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("quiz")).get('start')
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='知識測驗', contents=FlexContainer.from_json(line_flex_str))])
+
+class FAQ(Template):
+    """
+    常見問答
+    """
+    def execute(self, event, **kwargs):
+        user_msg = event.message.text
+        if user_msg == "常見問答":
+            faqs = spreadsheetService.get_worksheet_data('faqs')
+            for faq in faqs:
+                faq['action_text'] = faq['category']
+            line_flex_template = firebaseService.get_data(
+                DatabaseCollectionMap.LINE_FLEX,
+                DatabaseDocumentMap.LINE_FLEX.get("faq")
+            ).get("select")
+            
+        else:
+            faq_questions = spreadsheetService.get_worksheet_data('faq_questions')
+            faqs = [faq for faq in faq_questions if faq['category'] in user_msg]
+            line_flex_template = firebaseService.get_data(
+                DatabaseCollectionMap.LINE_FLEX,
+                DatabaseDocumentMap.LINE_FLEX.get("faq")
+            ).get("question")
+        line_flex_json = FlexMessageHelper.create_carousel_bubbles(faqs, json.loads(line_flex_template))
+        line_flex_str = json.dumps(line_flex_json)
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='常見問答', contents=FlexContainer.from_json(line_flex_str))])
+        return
