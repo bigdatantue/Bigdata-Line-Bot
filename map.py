@@ -70,7 +70,8 @@ class Map:
         '設備租借': 'equipment',
         '計畫成果展示': 'gallery',
         '知識測驗': 'quiz'
-    }
+    }        
+    FAQ_SET = set({'課程內容', '學分與證書', '選課相關', '學習輔導', '活動消息'})
     COURSE = {
         'overview': '總覽',
         'basic': '基礎',
@@ -110,7 +111,8 @@ class DatabaseDocumentMap:
         "certificate": "certificate",
         "community": "community",
         "equipment": "equipment",
-        "quiz": "quiz"
+        "quiz": "quiz",
+        "faq": "faq"
     }
     QUICK_REPLY = {
         "course": "course",
