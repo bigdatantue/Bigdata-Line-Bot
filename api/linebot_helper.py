@@ -241,6 +241,13 @@ class RichMenuHelper:
 #     line_bot_api = MessagingApi(api_client)
 #     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
 
+#-------------------刪除所有rich menu的程式-------------------
+# with ApiClient(configuration) as api_client:
+#     line_bot_api = MessagingApi(api_client)
+#     richmenu_list = line_bot_api.get_rich_menu_list()
+#     for richmenu in richmenu_list.richmenus:
+#         richmenu_id = richmenu.rich_menu_id
+#         line_bot_api.delete_rich_menu(richmenu_id)
 
 #-----------------以下為sdk提供的方法-----------------
 # with ApiClient(configuration) as api_client:
