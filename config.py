@@ -29,6 +29,7 @@ class Config(metaclass=Singleton):
         self.FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', None)
         self.LINE_NOTIFY_CLIENT_ID = os.getenv('LINE_NOTIFY_CLIENT_ID', None)
         self.LINE_NOTIFY_CLIENT_SECRET = os.getenv('LINE_NOTIFY_CLIENT_SECRET', None)
+        self.LINE_NOTIFY_GROUP_TOKEN = os.getenv('LINE_NOTIFY_GROUP_TOKEN', None)
         self.check_env()
         self.line_bot_init()
         self.feature_init()
