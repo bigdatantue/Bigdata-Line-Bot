@@ -503,8 +503,8 @@ class Quiz(Task):
                 question_amount = quiz_flex_data.get('question_amount')
                 database_amount = quiz_flex_data.get('database_amount')
                 questions = spreadsheetService.get_worksheet_data('quiz_questions')
-                quiz_questions = random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], database_amount)
-                quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], question_amount - database_amount))
+                quiz_questions = random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], database_amount)
+                quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], question_amount - database_amount))
                 data = {
                     'task': 'quiz',
                     'mode': mode,
@@ -549,7 +549,7 @@ class Quiz(Task):
         question.update({
             'quiz_id': quiz_id,
             'no': question_no + 1,
-            'width': (100 // question_amount) * question_no
+            'width': round((100 / question_amount) * question_no)
         })
 
         line_flex_quiz = firebaseService.get_data(
@@ -663,7 +663,9 @@ class Quiz(Task):
             DatabaseDocumentMap.LINE_FLEX.get("quiz")
         ).get('competition_result')
         hours, minutes, seconds = spend_time_str.split(':')
-        params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds})
+        user_infos = spreadsheetService.get_worksheet_data('user_info')
+        user_picture_url = [user for user in user_infos if user.get('user_id') == user_id][0].get('picture_url')
+        params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds, 'user_picture_url': user_picture_url})
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
         return line_flex_str
     
