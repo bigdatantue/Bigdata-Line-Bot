@@ -52,8 +52,8 @@ class Config(metaclass=Singleton):
             print("Please set FIREBASE_CREDENTIALS environment variable.")
             sys.exit(1)
 
-        if self.LINE_NOTIFY_CLIENT_ID is None or self.LINE_NOTIFY_CLIENT_SECRET is None:
-            print("Please set LINE_NOTIFY_CLIENT_ID, LINE_NOTIFY_CLIENT_SECRET environment variables.")
+        if self.LINE_NOTIFY_CLIENT_ID is None or self.LINE_NOTIFY_CLIENT_SECRET is None or self.LINE_NOTIFY_GROUP_TOKEN is None:
+            print("Please set LINE_NOTIFY_CLIENT_ID, LINE_NOTIFY_CLIENT_SECRET or LINE_NOTIFY_GROUP_TOKEN environment variables.")
             sys.exit(1)
 
         if os.getenv('LIFF_ID_COMPACT') is None or os.getenv('LIFF_ID_TALL') is None or os.getenv('LIFF_ID_FULL') is None:
@@ -72,7 +72,7 @@ class Config(metaclass=Singleton):
         self.feature = {
             'menu': FeatureStatus.ENABLE,
             'setting': FeatureStatus.ENABLE,
-            'faq': FeatureStatus.DISABLE,
+            'faq': FeatureStatus.ENABLE,
             'course': FeatureStatus.ENABLE,
             'certificate': FeatureStatus.ENABLE,
             'counseling': FeatureStatus.ENABLE,
