@@ -31,7 +31,6 @@ class TaskFactory:
             'course': Course,
             'community': Communtity,
             'certificate': Certificate,
-            'counseling': Counseling,
             'equipment': Equipment,
             'quiz': Quiz,
             'faq': FAQ

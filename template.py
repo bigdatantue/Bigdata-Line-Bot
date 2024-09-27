@@ -26,6 +26,7 @@ class TemplateFactory:
             'setting': Setting,
             'course': Course,
             'certificate': Certificate,
+            'counseling': Counseling,
             'community': Communtity,
             'equipment': Equipment,
             'quiz': Quiz,
@@ -75,6 +76,17 @@ class Certificate(Template):
     def execute(self, event, **kwargs):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("certificate")).get('summary')
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='證書申請流程', contents=FlexContainer.from_json(line_flex_str))])
+
+class Counseling(Template):
+    """
+    課程諮詢建議
+    """
+    def execute(self, event, **kwargs):
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("counseling")
+        ).get('select')
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='課程諮詢/建議', contents=FlexContainer.from_json(line_flex_str))])
 
 class Communtity(Template):
     """

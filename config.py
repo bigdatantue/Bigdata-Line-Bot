@@ -75,6 +75,7 @@ class Config(metaclass=Singleton):
             'faq': FeatureStatus.DISABLE,
             'course': FeatureStatus.ENABLE,
             'certificate': FeatureStatus.ENABLE,
+            'counseling': FeatureStatus.ENABLE,
             'community': FeatureStatus.ENABLE,
             'equipment': FeatureStatus.ENABLE,
             'gallery': FeatureStatus.DISABLE,
