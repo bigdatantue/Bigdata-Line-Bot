@@ -42,6 +42,16 @@ class LineBotHelper:
             return [user_info.display_name, user_info.picture_url, user_info.language, user_info.status_message]
 
     @staticmethod
+    def check_is_fixing():
+        """Returns 
+        bool: 是否維修中
+        """
+        return firebaseService.get_data(
+            DatabaseCollectionMap.CONFIG,
+            DatabaseDocumentMap.CONFIG.get('system')
+        ).get('fixing', False)
+
+    @staticmethod
     def show_loading_animation_(event, time: int=10):
         """
         顯示載入動畫
@@ -231,6 +241,13 @@ class RichMenuHelper:
 #     line_bot_api = MessagingApi(api_client)
 #     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
 
+#-------------------刪除所有rich menu的程式-------------------
+# with ApiClient(configuration) as api_client:
+#     line_bot_api = MessagingApi(api_client)
+#     richmenu_list = line_bot_api.get_rich_menu_list()
+#     for richmenu in richmenu_list.richmenus:
+#         richmenu_id = richmenu.rich_menu_id
+#         line_bot_api.delete_rich_menu(richmenu_id)
 
 #-----------------以下為sdk提供的方法-----------------
 # with ApiClient(configuration) as api_client:

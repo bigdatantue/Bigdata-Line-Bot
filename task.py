@@ -31,9 +31,9 @@ class TaskFactory:
             'course': Course,
             'community': Communtity,
             'certificate': Certificate,
-            'counseling': Counseling,
             'equipment': Equipment,
-            'quiz': Quiz
+            'quiz': Quiz,
+            'faq': FAQ
         }
 
     def get_task(self, task_name):
@@ -145,27 +145,6 @@ class Certificate(Task):
         if type == 'process':
             image_url = 'https://bigdatalinebot.blob.core.windows.net/linebot/Micro-Credit-Course-Apply-Process.png'
             LineBotHelper.reply_message(event, [ImageMessage(original_content_url=image_url, preview_image_url=image_url)])
-            return
-
-class Counseling(Task):
-    """
-    線上輔導+實體預約
-    """
-    def execute(self, event, params):
-        counseling_type = params.get('type')
-        if counseling_type == 'online':
-            line_flex_str = firebaseService.get_data(
-                DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling")
-            ).get("online")
-            LineBotHelper.reply_message(event, [FlexMessage(alt_text='線上輔導', contents=FlexContainer.from_json(line_flex_str))])
-            return
-        else:
-            line_flex_str = firebaseService.get_data(
-                DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("counseling")
-            ).get("physical")
-            LineBotHelper.reply_message(event, [FlexMessage(alt_text='實體預約', contents=FlexContainer.from_json(line_flex_str))])
             return
         
 class Equipment(Task):
@@ -523,8 +502,8 @@ class Quiz(Task):
                 question_amount = quiz_flex_data.get('question_amount')
                 database_amount = quiz_flex_data.get('database_amount')
                 questions = spreadsheetService.get_worksheet_data('quiz_questions')
-                quiz_questions = random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], database_amount)
-                quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], question_amount - database_amount))
+                quiz_questions = random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], database_amount)
+                quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], question_amount - database_amount))
                 data = {
                     'task': 'quiz',
                     'mode': mode,
@@ -569,7 +548,7 @@ class Quiz(Task):
         question.update({
             'quiz_id': quiz_id,
             'no': question_no + 1,
-            'width': (100 // question_amount) * question_no
+            'width': round((100 / question_amount) * question_no)
         })
 
         line_flex_quiz = firebaseService.get_data(
@@ -683,7 +662,9 @@ class Quiz(Task):
             DatabaseDocumentMap.LINE_FLEX.get("quiz")
         ).get('competition_result')
         hours, minutes, seconds = spend_time_str.split(':')
-        params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds})
+        user_infos = spreadsheetService.get_worksheet_data('user_info')
+        user_picture_url = [user for user in user_infos if user.get('user_id') == user_id][0].get('picture_url')
+        params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds, 'user_picture_url': user_picture_url})
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
         return line_flex_str
     
@@ -802,3 +783,13 @@ class Quiz(Task):
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
                 break
         return line_flex_str
+
+class FAQ(Task):
+    """
+    常見問答
+    """
+    def execute(self, event, params):
+        id = params.get('id')
+        faq_questions = spreadsheetService.get_worksheet_data('faq_questions')
+        answer = [faq for faq in faq_questions if faq.get('id') == int(id)][0].get('answer')
+        return LineBotHelper.reply_message(event, [TextMessage(text=answer)])

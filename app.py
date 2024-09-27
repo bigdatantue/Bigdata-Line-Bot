@@ -4,6 +4,7 @@ from map import Map, FeatureStatus, Permission
 from api.linebot_helper import LineBotHelper
 from flask import Flask, request, abort
 from line_notify_app import line_notify_app
+from liff_app import liff_app
 from linebot.v3.exceptions import (
     InvalidSignatureError
 )
@@ -18,9 +19,11 @@ from linebot.v3.messaging import (
     ImageMessage,
     TextMessage
 )
+import traceback
 
 app = Flask(__name__)
 app.register_blueprint(line_notify_app, url_prefix='/notify')
+app.register_blueprint(liff_app, url_prefix='/liff')
 
 # 初始化 Config
 config = Config()
@@ -28,6 +31,7 @@ configuration = config.configuration
 line_handler = config.handler
 spreadsheetService = config.spreadsheetService
 firebaseService = config.firebaseService
+lineNotifyService = config.lineNotifyService
 
 # domain root
 @app.route('/')
@@ -79,6 +83,8 @@ def handle_follow(event):
         LineBotHelper.reply_message(event, messages)
     except Exception as e:
         app.logger.error(e)
+        error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
     
 @line_handler.add(UnfollowEvent)
@@ -93,6 +99,8 @@ def handle_unfollow(event):
         spreadsheetService.set_user_status(user_id, False)
     except Exception as e:
         app.logger.error(e)
+        error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
 
 @line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -100,10 +108,15 @@ def handle_message(event):
     Handle文字訊息事件
     """
     try:
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         # 取得使用者文字訊息
         user_msg = event.message.text
         user_id = event.source.user_id
-        feature = Map.FEATURE.get(user_msg)    
+        feature = Map.FEATURE.get(user_msg)
+        # 如果使用者輸入的文字為FAQ的文字，則設定功能為FAQ
+        if user_msg in Map.FAQ_SET:
+            feature = 'faq'
         temp = firebaseService.get_data('temp', user_id)
 
         # 判斷使用者輸入的文字是否為功能
@@ -136,6 +149,8 @@ def handle_message(event):
                 return
     except Exception as e:
         app.logger.error(e)
+        error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
 
 @line_handler.add(PostbackEvent)
@@ -144,6 +159,8 @@ def handle_postback(event):
     Handle Postback事件
     """
     try:
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         postback_data = event.postback.data
         if 'richmenu' in postback_data:
             return
@@ -166,6 +183,8 @@ def handle_postback(event):
             return
     except Exception as e:
         app.logger.error(e)
+        error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
 
 if __name__ == "__main__":

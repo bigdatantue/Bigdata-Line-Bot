@@ -29,6 +29,7 @@ class Config(metaclass=Singleton):
         self.FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', None)
         self.LINE_NOTIFY_CLIENT_ID = os.getenv('LINE_NOTIFY_CLIENT_ID', None)
         self.LINE_NOTIFY_CLIENT_SECRET = os.getenv('LINE_NOTIFY_CLIENT_SECRET', None)
+        self.LINE_NOTIFY_GROUP_TOKEN = os.getenv('LINE_NOTIFY_GROUP_TOKEN', None)
         self.check_env()
         self.line_bot_init()
         self.feature_init()
@@ -37,6 +38,10 @@ class Config(metaclass=Singleton):
         """確認環境變數是否正確設定"""
         if self.CHANNEL_SECRET is None or self.CHANNEL_ACCESS_TOKEN is None:
             print("Please set LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN environment variables.")
+            sys.exit(1)
+
+        if os.getenv('GDRIVE_API_CREDENTIALS') is None:
+            print("Please set GDRIVE_API_CREDENTIALS environment variable.")
             sys.exit(1)
         
         if self.SPREADSHEET_URL is None:
@@ -51,6 +56,10 @@ class Config(metaclass=Singleton):
             print("Please set LINE_NOTIFY_CLIENT_ID, LINE_NOTIFY_CLIENT_SECRET environment variables.")
             sys.exit(1)
 
+        if os.getenv('LIFF_ID_COMPACT') is None or os.getenv('LIFF_ID_TALL') is None or os.getenv('LIFF_ID_FULL') is None:
+            print("Please set LIFF_ID_COMPACT, LIFF_ID_TALL, LIFF_ID_FULL environment variables.")
+            sys.exit(1)        
+
     def line_bot_init(self):
         """初始化LINE Bot相關物件"""
         self.handler = WebhookHandler(self.CHANNEL_SECRET)
@@ -62,12 +71,12 @@ class Config(metaclass=Singleton):
     def feature_init(self):
         self.feature = {
             'menu': FeatureStatus.ENABLE,
-            'setting': FeatureStatus.DISABLE,
+            'setting': FeatureStatus.ENABLE,
             'faq': FeatureStatus.DISABLE,
             'course': FeatureStatus.ENABLE,
             'certificate': FeatureStatus.ENABLE,
-            'community': FeatureStatus.ENABLE,
             'counseling': FeatureStatus.ENABLE,
+            'community': FeatureStatus.ENABLE,
             'equipment': FeatureStatus.ENABLE,
             'gallery': FeatureStatus.DISABLE,
             'quiz': FeatureStatus.ENABLE

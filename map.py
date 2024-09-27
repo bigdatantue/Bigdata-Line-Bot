@@ -1,4 +1,5 @@
 from enum import Enum, IntEnum
+import os
 
 class FeatureStatus(Enum):
     """
@@ -44,6 +45,17 @@ class Permission(IntEnum):
     # 管理員
     ADMIN = 4
 
+class LIFFSize(Enum):
+    """
+    LIFF尺寸
+    """
+    # Compact
+    COMPACT = os.getenv('LIFF_ID_COMPACT')
+    # Tall
+    TALL = os.getenv('LIFF_ID_TALL')
+    # Full
+    FULL = os.getenv('LIFF_ID_FULL')
+
 class Map:
     """
     其他Map
@@ -54,12 +66,13 @@ class Map:
         '常見問答': 'faq',
         '開課時間查詢': 'course',
         '證書申請流程': 'certificate',
+        '課程諮詢建議': 'counseling',
         '社群學習資源': 'community',
-        '線上輔導+實體預約': 'counseling',
         '設備租借': 'equipment',
         '計畫成果展示': 'gallery',
         '知識測驗': 'quiz'
-    }
+    }        
+    FAQ_SET = set({'課程內容', '學分與證書', '選課相關', '學習輔導', '活動消息'})
     COURSE = {
         'overview': '總覽',
         'basic': '基礎',
@@ -76,6 +89,7 @@ class DatabaseCollectionMap:
     """
     Map資料庫Collection名稱
     """
+    CONFIG = "config"
     RICH_MENU = "rich_menu"
     LINE_FLEX = "line_flex"
     QUICK_REPLY = "quick_reply"
@@ -85,6 +99,9 @@ class DatabaseDocumentMap:
     """
     Map資料庫Document名稱
     """
+    CONFIG = {
+        "system": "system"
+    }
     RICH_MENU = {
         "a": "page1",
         "b": "page2"
@@ -93,10 +110,11 @@ class DatabaseDocumentMap:
         "menu": "menu",
         "course": "course",
         "certificate": "certificate",
-        "community": "community",
         "counseling": "counseling",
+        "community": "community",
         "equipment": "equipment",
-        "quiz": "quiz"
+        "quiz": "quiz",
+        "faq": "faq"
     }
     QUICK_REPLY = {
         "course": "course",
