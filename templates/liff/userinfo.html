@@ -2,85 +2,160 @@
 {% block title %}個人資料{% endblock %}
 {% block content %}
 <form class="needs-validation" novalidate>
-    <h4>一、基本資料</h4>
-    <div class="row g-3" style="margin: 10px">
-        <div class="col-md-6">
-            <label for="name" class="form-label">姓名</label>
-            <input type="text" id="name" class="form-control" value="{{ user_info.name }}" required>
-            <div class="invalid-feedback">
-                姓名欄位必填
+    <div class="container-fluid py-4">
+        <h4 class="border-bottom pb-2">一、身份選擇</h4>
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label for="identity" class="form-label">身份<span style="color: red;">*</span></label>
+                <select id="identity" class="form-select" required>
+                    <option value="" selected disabled>請選擇身份</option>
+                    <option value="國北教大學生">國北教大學生</option>
+                    <option value="國北教大教職員">國北教大教職員</option>
+                    <option value="校外學生">校外學生</option>
+                    <option value="社會人士">社會人士</option>
+                </select>
+                <div class="invalid-feedback">
+                    請選擇身份
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <label for="studentId" class="form-label">學號</label>
-            <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required>
-            <div class="invalid-feedback">
-                學號欄位必填或格式錯誤
+
+        <h4 class="border-bottom pb-2">二、基本資料</h4>
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label for="name" class="form-label">姓名<span style="color: red;">*</span></label>
+                <input type="text" id="name" class="form-control" value="{{ user_info.name }}" required>
+                <div class="invalid-feedback">
+                    姓名欄位必填
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="gender" class="form-label">性別<span style="color: red;">*</span></label>
+                <select id="gender" class="form-select" required>
+                    <option value="" selected disabled>請選擇生理性別</option>
+                    <option value="男">男</option>
+                    <option value="女">女</option>
+                </select>
+                <div class="invalid-feedback">
+                    性別必填
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <label for="email" class="form-label">Email</label>
-            <input type="email" id="email" class="form-control" value="{{ user_info.email }}" required>
-            <div class="invalid-feedback">
-                Email欄位必填
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <label for="email" class="form-label">Email<span style="color: red;">*</span></label>
+                <input type="email" id="email" class="form-control" value="{{ user_info.email }}" required>
+                <div class="invalid-feedback">
+                    Email欄位必填
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label for="phone" class="form-label">手機<span style="color: red;">*</span></label>
+                <input type="text" id="phone" class="form-control" value="{{ user_info.phone }}" maxlength="10" minlength="10" required>
+                <div class="invalid-feedback">
+                    手機號碼格式錯誤
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <label for="phone" class="form-label">手機</label>
-            <input type="text" id="phone" class="form-control" value="{{ user_info.phone }}" maxlength="10">
-        </div>
-        <div class="invalid-feedback">
-            手機格式錯誤
-        </div>
-    </div>
-    <br>
-    <h4>二、系級</h4>
-    <div class="row g-3" style="margin: 10px">
-        <div class="col-md-4">
-            <label for="college" class="form-label">所屬學院</label>
-            <select id="college" class="form-select" required>
-                <option value="" selected disabled>請選擇學院</option>
-                <option value="教育學院">教育學院</option>
-                <option value="理學院">理學院</option>
-                <option value="人文藝術學院">人文藝術學院</option>
-                <option value="國際學位學程">國際學位學程</option>
-            </select>
-            <div class="invalid-feedback">
-                學院欄位必填
+
+        <h4 class="border-bottom pb-2">三、學術或工作機構</h4>
+        <!-- 學生資料區塊 -->
+        <div id="ntueStudentFields" style="display: none;">
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="studentId" class="form-label">學號<span style="color: red;">*</span></label>
+                    <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required>
+                    <div class="invalid-feedback">
+                        學號必填或學號格式錯誤
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="college" class="form-label">學院<span style="color: red;">*</span></label>
+                    <select id="college" class="form-select" required>
+                        <option value="" selected disabled>請選擇學院</option>
+                        <option value="教育學院">教育學院</option>
+                        <option value="理學院">理學院</option>
+                        <option value="人文藝術學院">人文藝術學院</option>
+                        <option value="國際學位學程">國際學位學程</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        學院欄位必填
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="department" class="form-label">系所<span style="color: red;">*</span></label>
+                    <select id="department" class="form-select" required>
+                        <option value="" selected disabled>請選擇系所</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        系所欄位必填
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="grade" class="form-label">年級<span style="color: red;">*</span></label>
+                    <select id="grade" class="form-select" required>
+                        <option value="" selected disabled>請選擇年級</option>
+                        <option value="大一">大一</option>
+                        <option value="大二">大二</option>
+                        <option value="大三">大三</option>
+                        <option value="大四">大四</option>
+                        <option value="碩士班">碩士班</option>
+                        <option value="博士班">博士班</option>
+                    </select>
+                    <div class="invalid-feedback">
+                        年級欄位必填
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <label for="department" class="form-label">系所</label>
-            <select id="department" class="form-select" required>
-                <option value="" selected disabled>請選擇系所</option>
-            </select>
-            <div class="invalid-feedback">
-                系所欄位必填
+
+        <!-- 外部學生資料區塊 -->
+        <div id="externalStudentFields" style="display: none;">
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="schoolName" class="form-label">學校名稱<span style="color: red;">*</span></label>
+                    <input type="text" id="schoolName" class="form-control" required>
+                    <div class="invalid-feedback">
+                        學校名稱必填
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="extDepartment" class="form-label">系所<span style="color: red;">*</span></label>
+                    <input type="text" id="extDepartment" class="form-control" required>
+                    <div class="invalid-feedback">
+                        系所欄位必填
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="extGrade" class="form-label">年級<span style="color: red;">*</span></label>
+                    <input type="text" id="extGrade" class="form-control" required>
+                    <div class="invalid-feedback">
+                        年級欄位必填
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <label for="grade" class="form-label">年級</label>
-            <select id="grade" class="form-select" required>
-                <option value="" selected disabled>請選擇年級</option>
-                <option value="大一">大一</option>
-                <option value="大二">大二</option>
-                <option value="大三">大三</option>
-                <option value="大四">大四</option>
-                <option value="碩士班">碩士班</option>
-                <option value="博士班">博士班</option>
-            </select>
-            <div class="invalid-feedback">
-                年級欄位必填
+
+        <!-- 社會人士資料區塊 -->
+        <div id="socialIndividualFields" style="display: none;">
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="organization" class="form-label">所屬單位名稱<span style="color: red;">*</span></label>
+                    <input type="text" id="organization" class="form-control" required>
+                    <div class="invalid-feedback">
+                        所屬單位名稱必填
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="row" style="margin: 10px">
-        <div class="col-12 d-flex justify-content-end">
-            <button class="btn btn-success" id="submitBtn">送出</button>
-            <button class="btn btn-success" id="loadBtn" type="button" disabled style="display: none;">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="vertical-align: baseline;"></span>
-                處理中...
-            </button>
+        <div class="row mt-4">
+            <div class="col-12 d-flex justify-content-end">
+                <button class="btn btn-success" id="submitBtn">送出</button>
+                <button class="btn btn-success" id="loadBtn" type="button" disabled style="display: none;">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    處理中...
+                </button>
+            </div>
         </div>
     </div>
 </form>
@@ -97,14 +172,20 @@
 
     $(document).ready(function () {
         initializeLiff('{{ liff_id }}');
-
-        // 初始化下拉選單
-        $('#college').val('{{ user_info.college }}');
-        updateDepartmentDropdown();
-        $('#department').val('{{ user_info.department }}');
-        $('#grade').val('{{ user_info.grade }}');
-
-
+    
+        // 設置表單初始化
+        initDropDowns();
+    
+        // Identity 下拉選單變化時動態顯示相關欄位
+        $('#identity').change(function () {
+            updateFieldsBasedOnIdentity($(this).val());
+            // 僅在身份選擇後清空不相關欄位資料（避免新使用者identity在試算表中還是Null的時候，系統會不斷執行清除資料）
+            if (identity) {
+                // 清空不相關身份的欄位資料（為避免使用者切換身份後，不相關欄位資料仍保留）
+                clearIrrelevantFields(identity);
+            }
+        });
+    
         // 選擇學院時更新系所下拉選單
         $('#college').change(function () {
             if ($('#college').val() === '') {
@@ -114,7 +195,7 @@
             }
             updateDepartmentDropdown();
         });
-
+    
         // 送出表單
         $('form').submit(function (e) {
             e.preventDefault();
@@ -126,15 +207,22 @@
             }
             $('#submitBtn').hide();
             $('#loadBtn').show();
+            // 收集表單資料
             data = {
                 userId: userId,
+                identity: $('#identity').val(),
                 name: $('#name').val(),
+                gender: $('#gender').val(),
                 studentId: $('#studentId').val(),
                 email: $('#email').val(),
                 phone: $('#phone').val(),
                 college: $('#college').val(),
                 department: $('#department').val(),
                 grade: $('#grade').val(),
+                schoolName: $('#schoolName').val(),
+                extDepartment: $('#extDepartment').val(),
+                extGrade: $('#extGrade').val(),
+                organization: $('#organization').val(),
             }
             $.ajax({
                 url: location.origin + "/liff/userinfo",
@@ -145,16 +233,61 @@
                         type: 'text',
                         text: response.message
                     }])
-                        .then(() => {
-                            liff.closeWindow();
-                        });
+                    .then(() => {
+                        liff.closeWindow();
+                    });
                 },
                 error: function (error) {
                     console.log('error', error);
                 }
             });
         });
+    
+        // 設置表單初始值
+        // 切記這裡後面的user_info.欄位要跟試算表的欄位名稱一樣！若調整試算表欄位名稱也要同步調整這裡！
+        function initDropDowns() {
+            let identity = '{{ user_info.identity }}';
+            $('#identity').val(identity);
+            $('#gender').val('{{ user_info.gender }}');
+            $('#college').val('{{ user_info.college }}');
+            $('#grade').val('{{ user_info.grade }}');
+            $('#schoolName').val('{{ user_info.schoolName }}');
+            $('#organization').val('{{ user_info.organization }}');
+            $('#studentId').val('{{ user_info.student_id }}');
+            $('#extDepartment').val('{{ user_info.extDepartment }}');
+            $('#extGrade').val('{{ user_info.extGrade }}');
 
+            // 如果有學院預設值，觸發更新系所
+            // 系統偵測到使用者選擇學院後，會自動更新系所選項。但若是已經有預設值，則不會觸發更新系所，因此需要手動觸發
+            let college = $('#college').val();
+            if (college) {
+                updateDepartmentDropdown();  // 自動更新系所選項
+                $('#department').val('{{ user_info.department }}');  // 設置預設的系所
+            }
+
+            // 根據身份更新欄位顯示
+            updateFieldsBasedOnIdentity(identity);
+        }
+    
+        // 根據身份顯示或隱藏相關欄位
+        function updateFieldsBasedOnIdentity(identity) {
+            $('#ntueStudentFields, #externalStudentFields, #socialIndividualFields').hide();
+            $('#ntueStudentFields input, #ntueStudentFields select').prop('required', false);
+            $('#externalStudentFields input').prop('required', false);
+            $('#socialIndividualFields input').prop('required', false);
+    
+            if (identity === '國北教大學生') {
+                $('#ntueStudentFields').show();
+                $('#ntueStudentFields input, #ntueStudentFields select').prop('required', true);
+            } else if (identity === '校外學生') {
+                $('#externalStudentFields').show();
+                $('#externalStudentFields input').prop('required', true);
+            } else if (identity === '社會人士' || identity === '國北教大教職員') {
+                $('#socialIndividualFields').show();
+                $('#socialIndividualFields input').prop('required', true);
+            }
+        }
+    
         // 初始化LIFF
         function initializeLiff(liffId) {
             liff.init({
@@ -177,17 +310,35 @@
                 console.log('初始化失敗', err);
             });
         }
-        
+        // 清空不相關身份的欄位資料（為避免使用者切換身份後，不相關欄位資料仍保留，例如：從校外學生切換到國北教大學生，校外學生的學校名稱、系所、年級欄位資料仍保留）
+        function clearIrrelevantFields(identity) {
+            if (identity !== '國北教大學生') {
+                $('#studentId').val('');
+                $('#college').val('');
+                $('#department').val('');
+                $('#grade').val('');
+            }
+            if (identity !== '校外學生') {
+                $('#schoolName').val('');
+                $('#extDepartment').val('');
+                $('#extGrade').val('');
+            }
+            if (identity !== '社會人士' && identity !== '國北教大教職員') {
+                $('#organization').val('');
+            }
+        }
         // 更新系所下拉選單
         function updateDepartmentDropdown() {
             let college = $('#college').val();
             if (college) {
-                let department = colleges[college];
+                let department = colleges[college];  // 根據學院選擇載入對應的系所
                 $('#department').empty();
                 $('#department').append('<option value="" selected disabled>請選擇系所</option>');
-                department.forEach(function (department) {
-                    $('#department').append('<option value="' + department + '">' + department + '</option>');
-                });
+                if (department) {  // 確保 department 不為空
+                    department.forEach(function (dept) {
+                        $('#department').append('<option value="' + dept + '">' + dept + '</option>');
+                    });
+                }
             }
         }
     });
