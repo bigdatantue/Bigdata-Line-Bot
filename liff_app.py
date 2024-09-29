@@ -34,20 +34,28 @@ def userinfo():
     user_infos = spreadsheetService.get_worksheet_data('user_details')
     user_info = [user_info for user_info in user_infos if user_info['user_id'] == user_id]
     user_info = user_info[0] if user_info else None
-
+    if user_info:
+        phone = str(user_info['phone'])
+        # 判斷電話號碼長度是否不足10位，如果不足則補0
+        if len(phone) < 10:
+            phone = phone.zfill(10)
+        user_info['phone'] = phone
     return render_template('liff/userinfo.html', **locals())
 
 @liff_app.route('/userinfo', methods=['POST'])
 def userinfo_post():
     data = request.form
     user_id = data.get('userId')
-    user_data = [data.get(field) if data.get(field) else '' for field in ['userId', 'name', 'studentId', 'email', 'phone', 'college', 'department', 'grade']]
+    #此處的順序需與試算表的欄位順序一致、名稱需與userinfo.html的data一致
+    column_list = ['userId', 'name', 'identity', 'gender', 'studentId', 'email', 'phone', 'college', 'schoolName', 'department', 'grade', 'extDepartment', 'extGrade', 'organization']
+    user_data = [data.get(field) if data.get(field) else '' for field in column_list]
+                 
     
     wks = spreadsheetService.sh.worksheet_by_title('user_details')
     row_index = spreadsheetService.get_row_index(wks, 'user_id', user_id)
     
     if row_index:
-        spreadsheetService.update_cells_values('user_details', f'A{row_index}:H{row_index}', [user_data])
+        spreadsheetService.update_cells_values('user_details', f'A{row_index}:N{row_index}', [user_data])
     else:
         wks.append_table(values=user_data)
     return jsonify({'message': '設定成功'})
