@@ -1,5 +1,5 @@
 from config import Config
-from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, EquipmentStatus, Permission
+from map import Map, DatabaseCollectionMap, DatabaseDocumentMap, EquipmentStatus, Permission, LIFFSize
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
 from linebot.v3.messaging import (
     TextMessage,
@@ -480,16 +480,39 @@ class Quiz(Task):
                 rank_line_flex_str = __class__.__generate_rank_line_flex(competition_id, user_id)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='排行榜', contents=FlexContainer.from_json(rank_line_flex_str))])
             elif mode == 'history':
-                return LineBotHelper.reply_message(event, [TextMessage(text='敬請期待')])            
+                return LineBotHelper.reply_message(event, [TextMessage(text='敬請期待')])
+            elif mode == 'competition_rule':
+                # 測驗說明
+                line_flex_str = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                ).get('competition_rule')
+                userinfo_url = f'https://liff.line.me/{LIFFSize.TALL.value}/userinfo?userId={user_id}'
+                line_flex_json = LineBotHelper.replace_variable(line_flex_str, {'category': category, 'competition_id': competition_id, 'userinfo_url': userinfo_url})
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='測驗說明', contents=FlexContainer.from_json(line_flex_json))])
             if category:
                 quiz_id = LineBotHelper.generate_id()
                 current_time = LineBotHelper.get_current_time().strftime('%Y-%m-%d %H:%M:%S')
                 if mode == 'competition':
+                    # 確認使用者是否有在設定中填寫資料
+                    user_details = spreadsheetService.get_worksheet_data('user_details')
+                    user_detail = [user for user in user_details if user.get('user_id') == user_id]
+                    if len(user_detail) == 0:
+                        return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，完成填寫後才可以參與競賽')])
+                    
                     competition_logs = spreadsheetService.get_worksheet_data('competitions')
                     competition_log = [log for log in competition_logs if log.get('competition_id') == competition_id and log.get('user_id') == user_id]
                     if len(competition_log) > 0:
-                        if competition_log[0].get('time_spent'):
+                        quiz_id = competition_log[0].get('quiz_id')
+                        quiz_records = spreadsheetService.get_worksheet_data('quiz_records')
+                        quiz_record = [record for record in quiz_records if record.get('quiz_id') == quiz_id]
+                        if competition_id and not __class__.__check_competition_open_time(competition_id):
+                            return LineBotHelper.reply_message(event, [TextMessage(text='該競賽已結束!')])
+                        elif competition_log[0].get('time_spent'):
                             return LineBotHelper.reply_message(event, [TextMessage(text='您已參加過此競賽')])
+                        elif len(quiz_record) > 0:
+                            firebaseService.delete_data(DatabaseCollectionMap.TEMP, user_id)
+                            return LineBotHelper.reply_message(event, [TextMessage(text='偵測到異常行為，視為未完賽')])
                         else:
                             return LineBotHelper.reply_message(event, [TextMessage(text='您的競賽已在進行中')])
                     if __class__.__check_competition_open_time(competition_id):
@@ -504,6 +527,7 @@ class Quiz(Task):
                 questions = spreadsheetService.get_worksheet_data('quiz_questions')
                 quiz_questions = random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], database_amount)
                 quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], question_amount - database_amount))
+                random.shuffle(quiz_questions)
                 data = {
                     'task': 'quiz',
                     'mode': mode,
@@ -725,7 +749,7 @@ class Quiz(Task):
 
         user_info = spreadsheetService.get_worksheet_data('user_info')
         competions = spreadsheetService.get_worksheet_data('competitions')
-        competition = [competition for competition in competions if competition.get('competition_id') == competition_id]
+        competition = [competition for competition in competions if competition.get('competition_id') == competition_id and competition.get('time_spent')]
         merged_data = []
         data = {}
         if len(competition) == 0:
