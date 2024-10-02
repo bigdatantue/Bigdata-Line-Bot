@@ -159,12 +159,12 @@ def handle_postback(event):
     Handle Postback事件
     """
     try:
-        if LineBotHelper.check_is_fixing():
-            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         postback_data = event.postback.data
         if 'richmenu' in postback_data:
-            return
-        LineBotHelper.show_loading_animation_(event)
+            return LineBotHelper.show_loading_animation_(event)
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
+        
         # 如果有datetimpicker的參數，才會有postback_params
         postback_params = event.postback.params
         params = postback_params if postback_params else {}
