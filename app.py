@@ -161,7 +161,8 @@ def handle_postback(event):
     try:
         postback_data = event.postback.data
         if 'richmenu' in postback_data:
-            return LineBotHelper.show_loading_animation_(event)
+            return
+        LineBotHelper.show_loading_animation_(event)
         if LineBotHelper.check_is_fixing():
             return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         
