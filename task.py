@@ -411,6 +411,8 @@ class Quiz(Task):
     """
     知識測驗
     """
+    gold_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+    gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
     def execute(self, event, params):
         user_id = event.source.user_id
         question_no = params.get('no')
@@ -472,6 +474,8 @@ class Quiz(Task):
         else:
             # 進行測驗
             mode = params.get('mode')
+            type = params.get('type')
+            question_id = params.get('id')
             category = params.get('category')
             competition_id = params.get('competition_id')
             quiz_flex_datas = spreadsheetService.get_worksheet_data('quizzes')
@@ -479,8 +483,16 @@ class Quiz(Task):
                 # 排行榜
                 rank_line_flex_str = __class__.__generate_rank_line_flex(competition_id, user_id)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='排行榜', contents=FlexContainer.from_json(rank_line_flex_str))])
-            elif mode == 'history':
-                return LineBotHelper.reply_message(event, [TextMessage(text='敬請期待')])
+            elif mode == 'history' and not question_id:
+                if type == 'user':
+                    return __class__.__generate_personal_history_question(event, category, user_id)
+                elif type == 'all':
+                    return __class__.__generate_global_history_question(event, category)
+                else:
+                    return __class__.__generate_history_select(event, category)
+            elif mode == 'history' and question_id:
+                return __class__.__generate_complete_history_question(event, question_id)
+
             elif mode == 'competition_rule':
                 # 測驗說明
                 line_flex_str = firebaseService.get_data(
@@ -566,9 +578,6 @@ class Quiz(Task):
         """Returns
         生成題目的Line Flex
         """
-        gold_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
-        gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
-
         question.update({
             'quiz_id': quiz_id,
             'no': question_no + 1,
@@ -583,8 +592,8 @@ class Quiz(Task):
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
         # 生成星星
         difficulty = int(question.get('difficulty'))
-        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gold_star_url}, difficulty)
-        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gray_star_url}, 5 - difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gold_star_url}, difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gray_star_url}, 5 - difficulty)
         return line_flex_str
     
     def __generate_answer_line_flex(question: dict, is_correct: bool):
@@ -807,6 +816,138 @@ class Quiz(Task):
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
                 break
         return line_flex_str
+
+    def __generate_history_select(event, category):
+        """Return
+        使用者點擊歷史答題功能後，生成讓使用者選擇「我的錯題」和「全服錯題」選項的Flex Message
+        """
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        ).get('history_select')
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"category" : category})
+        return LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇查看範圍', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_global_history_question(event, category):
+        """Return
+        生成「全服錯題」的Carousel，包含全服答錯率最高的十題
+        """
+        quiz_questions = spreadsheetService.get_worksheet_data('quiz_questions')
+        # 過濾掉回答數為0、且為同個類別主題的題目
+        filtered_questions = [q for q in quiz_questions if q['category'] == category and float(q['total_count']) != 0]
+        if not filtered_questions:
+            return LineBotHelper.reply_message(event, [TextMessage(text='全服尚未有任何答題紀錄！')])
+        else:
+            # 根據正確率排序並選取前10個題目（正確率最低的前十題）
+            sorted_questions = sorted(filtered_questions, key=lambda x: float(x['correct_rate']))[:10]
+
+            # 生成carousel bubble
+            line_flex_str = firebaseService.get_data(
+                DatabaseCollectionMap.LINE_FLEX,
+                DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            ).get('history_question_list')
+
+            for question in sorted_questions:
+                question['width'] = 100 - question['correct_rate']
+                difficulty = int(question['difficulty'])
+
+                # 根據難度逐個替換 star_url
+                for i in range(difficulty):
+                    question[f'star_url_{i+1}'] = __class__.gold_star_url  # 替換金色星星
+                for i in range(5 - difficulty):
+                    question[f'star_url_{difficulty + i + 1}'] = __class__.gray_star_url  # 替換灰色星星
+
+            line_flex_str = FlexMessageHelper.create_carousel_bubbles(sorted_questions, json.loads(line_flex_str))
+            line_flex_str = json.dumps(line_flex_str)
+            return LineBotHelper.reply_message(event, [FlexMessage(alt_text='全服答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_personal_history_question(event, category, user_id):
+        """Return
+        生成「我的錯題」的Carousel，包含個人答錯率最高的十題
+        """
+        quiz_records_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_records'))
+        quiz_questions_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_questions'))
+
+        # 判斷全服是否有任何答題紀錄（若每次釋出新的時quiz_records會是空的，操作空的DataFrame會報錯）
+        if quiz_records_df.empty:
+            return LineBotHelper.reply_message(event, [TextMessage(text='尚未有任何答題紀錄！')])
+        else:
+            # 篩選同個類別主題的題目
+            quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
+            # 為了避免兩個DataFrame欄位名稱重複，將quiz_questions的answer欄位改名為correct_answer
+            quiz_questions_df = quiz_questions_df.rename(columns={'answer': 'correct_answer'})
+            merged_df = pd.merge(quiz_records_df, quiz_questions_df, left_on='question_id', right_on='id', how='left')
+
+            # 選取user_id為user_id的資料（該使用者個人的答題資料）
+            user_records_df = merged_df[merged_df['user_id'] == user_id]
+
+            # 判斷使用者是否有作答過任何題目（是否在quiz_records中有該使用者的答題記錄）
+            if user_records_df.empty:
+                return LineBotHelper.reply_message(event, [TextMessage(text='您尚未作答過任何題目！')])
+            else:
+                # 新增is_correct欄位，判斷使用者的答案是否正確
+                user_records_df['is_correct'] = user_records_df.apply(
+                    lambda row: 1 if row['answer'].lower() == row['correct_answer'].lower() else 0, axis=1
+                )
+
+                # 計算每個題目的答題次數和答對次數
+                question_stats = user_records_df.groupby('question_id').agg(
+                    total_attempts=('question_id', 'size'),
+                    correct_attempts=('is_correct', 'sum')
+                ).reset_index()
+
+                # 計算每個題目的答對率
+                question_stats['personal_correct_rate'] = (question_stats['correct_attempts'] / question_stats['total_attempts']) * 100
+
+                # 合併question_stats和quiz_questions，並選取personal_correct_rate最低的前10個題目
+                ten_questions_df = pd.merge(question_stats, quiz_questions_df, left_on='question_id', right_on='id', how='left').sort_values(by='personal_correct_rate').head(10)
+                
+                # 加入width欄位
+                ten_questions_df['width'] = 100 - ten_questions_df['correct_rate']  # 以正確率計算錯誤率並存入
+                # 加入star_url欄位，根據difficulty計算
+                for i, row in ten_questions_df.iterrows():
+                    difficulty = int(row['difficulty'])
+
+                    # 生成星星列表
+                    star_urls = [__class__.gold_star_url] * difficulty + [__class__.gray_star_url] * (5 - difficulty)
+
+                    # 將star_url列表中的每個URL存入對應的欄位
+                    for index, star_url in enumerate(star_urls):
+                        ten_questions_df.at[i, f'star_url_{index + 1}'] = star_url
+
+                # 抓模板
+                line_flex_str = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                ).get('history_question_list')
+
+                # 生成carousel bubble
+                line_flex_str = FlexMessageHelper.create_carousel_bubbles(ten_questions_df.to_dict('records'), json.loads(line_flex_str))
+                line_flex_str = json.dumps(line_flex_str)
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='個人答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_complete_history_question(event, question_id):
+        """Return
+        生成完整測驗題目的Flex Message（包含答案）
+        """
+        quiz_questions = spreadsheetService.get_worksheet_data('quiz_questions')
+
+        # 只提取id == question_id的題目資料
+        quiz_question = [question for question in quiz_questions if question.get('id') == int(question_id)][0]
+
+        # 生成題目的Line Flex
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        ).get('history_question_with_image' if quiz_question.get('image_url') else 'history_question')
+        quiz_question['width'] = 100 - quiz_question['correct_rate']
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, quiz_question)
+
+        # 生成星星
+        difficulty = int(quiz_question['difficulty'])
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gold_star_url}, difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gray_star_url}, 5 - difficulty)
+        return LineBotHelper.reply_message(event, [FlexMessage(alt_text='完整測驗題目', contents=FlexContainer.from_json(line_flex_str))])
 
 class FAQ(Task):
     """
