@@ -21,17 +21,6 @@ class EquipmentStatus(IntEnum):
     # 已借出
     LEND = 2
 
-class EquipmentType(IntEnum):
-    """
-    設備類型
-    """
-    # 小栗方 AI 學習機
-    AI = 1
-    # VIA Pixetto 視覺感測器
-    VIA = 2
-    # ALK950 邊緣運算推論器
-    ALK = 3
-
 class Permission(IntEnum):
     """
     權限
@@ -78,11 +67,6 @@ class Map:
         'basic': '基礎',
         'advanced': '進階',
         'practical': '實務'
-    }
-    EQUIPMENT_NAME = {
-        EquipmentType.AI: '小栗方 AI 學習機',
-        EquipmentType.VIA: 'VIA Pixetto 視覺感測器',
-        EquipmentType.ALK: 'ALK950 邊緣運算推論器'
     }
 
 class DatabaseCollectionMap:
