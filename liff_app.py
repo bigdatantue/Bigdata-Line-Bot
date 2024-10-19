@@ -1,10 +1,11 @@
 from config import Config
-from map import LIFFSize
+from map import LIFFSize, EquipmentStatus
 from flask import Blueprint, request, render_template, jsonify
 
 liff_app = Blueprint('liff_app', __name__)
 
 config = Config()
+firebaseService = config.firebaseService
 spreadsheetService = config.spreadsheetService
 
 # ----------------LIFF 三種尺寸跳轉用頁面(勿動) Start----------------
@@ -60,3 +61,49 @@ def userinfo_post():
         wks.append_table(values=user_data)
     return jsonify({'message': '設定成功'})
 # ----------------LIFF 頁面(根據需求設定不同大小) End----------------
+# ----------------設備租借表單 LIFF 頁面 Start----------------
+@liff_app.route('/tall/rent', methods=['GET'])
+def rent():
+    liff_id = LIFFSize.TALL.value
+    user_id = request.args.get('userId')
+    
+    # 從資料庫獲取設備數據
+    equipments = spreadsheetService.get_worksheet_data('equipments')
+    for equipment in equipments:
+        equipment_id = equipment.get('equipment_id')
+
+        # 計算每種設備的可借數量
+        total_conditions = [('type', '==', equipment_id)]
+        total_amount = len(firebaseService.filter_data('equipments', total_conditions))
+        lend_conditions = [
+            ('type', '==', equipment_id),
+            ('status', '==', EquipmentStatus.LEND)
+        ]
+        lend_amount = len(firebaseService.filter_data('equipments', lend_conditions))
+
+        # 更新可借數量
+        equipment['available_amount'] = total_amount - lend_amount
+
+    return render_template('liff/rent.html', liff_id=liff_id, equipments=equipments)
+
+# 處理設備租借表單的資料提交
+@liff_app.route('/rent', methods=['POST'])
+def submit_rent():
+    data = request.form  # 獲取前端表單數據
+
+    # 定義字段順序，確保這與 Google Sheets 表單欄位順序一致
+    column_list = ['userId', 'name', 'department', 'phone', 'equipment', 'quantity', 'remarks', 'borrow_date', 'return_date']
+    user_id = data.get('userId')
+    
+    # 動態獲取表單中的數據，按 column_list 順序組成列表
+    user_data = [data.get(field, '') for field in column_list]
+
+    try:
+        wks = spreadsheetService.sh.worksheet_by_title('rent')
+        wks.append_table(values=user_data)
+        return jsonify({'message': "提交成功"})
+
+    except Exception as e:
+        print(f'Error: {e}')
+        return jsonify({'error': '提交失敗，請稍後再試'}), 500
+
