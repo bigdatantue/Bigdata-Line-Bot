@@ -84,7 +84,7 @@ def handle_follow(event):
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
-        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
+        LineBotHelper.push_message(config.LINE_GROUP_ID, [TextMessage(text=f'發生錯誤！\n{error_message}')])
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
     
 @line_handler.add(UnfollowEvent)
@@ -100,7 +100,7 @@ def handle_unfollow(event):
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
-        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
+        LineBotHelper.push_message(config.LINE_GROUP_ID, [TextMessage(text=f'發生錯誤！\n{error_message}')])
 
 @line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
@@ -150,7 +150,7 @@ def handle_message(event):
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
-        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
+        LineBotHelper.push_message(config.LINE_GROUP_ID, [TextMessage(text=f'發生錯誤！\n{error_message}')])
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
 
 @line_handler.add(PostbackEvent)
@@ -185,7 +185,7 @@ def handle_postback(event):
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
-        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
+        LineBotHelper.push_message(config.LINE_GROUP_ID, [TextMessage(text=f'發生錯誤！\n{error_message}')])
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
 
 if __name__ == "__main__":

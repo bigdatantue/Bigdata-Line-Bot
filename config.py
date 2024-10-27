@@ -27,6 +27,7 @@ class Config(metaclass=Singleton):
         self.CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN', None)
         self.SPREADSHEET_URL = os.getenv('SPREADSHEET_URL', None)
         self.FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS', None)
+        self.LINE_GROUP_ID = os.getenv('LINE_GROUP_ID', None)
         self.LINE_NOTIFY_CLIENT_ID = os.getenv('LINE_NOTIFY_CLIENT_ID', None)
         self.LINE_NOTIFY_CLIENT_SECRET = os.getenv('LINE_NOTIFY_CLIENT_SECRET', None)
         self.LINE_NOTIFY_GROUP_TOKEN = os.getenv('LINE_NOTIFY_GROUP_TOKEN', None)
