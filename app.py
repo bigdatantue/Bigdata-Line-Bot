@@ -13,7 +13,8 @@ from linebot.v3.webhooks import (
     PostbackEvent,
     FollowEvent,
     UnfollowEvent,
-    TextMessageContent
+    TextMessageContent,
+    ImageMessageContent
 )
 from linebot.v3.messaging import (
     ImageMessage,
@@ -147,6 +148,24 @@ def handle_message(event):
                 task = strategy_class()
                 task.execute(event, {'user_msg': user_msg})
                 return
+    except Exception as e:
+        app.logger.error(e)
+        error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
+        LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
+
+@line_handler.add(MessageEvent, message=ImageMessageContent)
+def handle_image(event):
+    """
+    Handle圖片訊息事件
+    """
+    try:
+        if LineBotHelper.check_is_fixing():
+            return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
+        # 傳送linenotify通知有使用者上傳圖片
+        msg = f'有使用者上傳圖片！\nUser ID: {event.source.user_id}'
+        lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, msg)
+        return LineBotHelper.reply_message(event, [TextMessage(text='圖片上傳成功！')])
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))

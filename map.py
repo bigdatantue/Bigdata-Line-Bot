@@ -64,7 +64,7 @@ class Map:
         '主選單': 'menu',
         '設定': 'setting',
         '常見問答': 'faq',
-        '開課時間查詢': 'course',
+        '開課修業查詢': 'course',
         '證書申請流程': 'certificate',
         '課程諮詢建議': 'counseling',
         '社群學習資源': 'community',
