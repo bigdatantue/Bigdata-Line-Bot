@@ -7,7 +7,7 @@
         <div class="row g-3 mb-4">
             <div class="col-md-6">
                 <label for="identity" class="form-label">身份<span style="color: red;">*</span></label>
-                <select id="identity" class="form-select" required>
+                <select id="identity" class="form-select" required {{ 'disabled' if user_info.verification else '' }}>
                     <option value="" selected disabled>請選擇身份</option>
                     <option value="國北教大學生">國北教大學生</option>
                     <option value="國北教大教職員">國北教大教職員</option>
@@ -24,14 +24,14 @@
         <div class="row g-3 mb-4">
             <div class="col-md-6">
                 <label for="name" class="form-label">姓名<span style="color: red;">*</span></label>
-                <input type="text" id="name" class="form-control" value="{{ user_info.name }}" required>
+                <input type="text" id="name" class="form-control" value="{{ user_info.name }}" required {{ 'disabled' if user_info.verification else '' }}>
                 <div class="invalid-feedback">
                     姓名欄位必填
                 </div>
             </div>
             <div class="col-md-6">
                 <label for="gender" class="form-label">性別<span style="color: red;">*</span></label>
-                <select id="gender" class="form-select" required>
+                <select id="gender" class="form-select" required {{ 'disabled' if user_info.verification else '' }}>
                     <option value="" selected disabled>請選擇生理性別</option>
                     <option value="男">男</option>
                     <option value="女">女</option>
@@ -64,14 +64,14 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label for="studentId" class="form-label">學號<span style="color: red;">*</span></label>
-                    <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required>
+                    <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required {{ 'disabled' if user_info.verification else '' }}>
                     <div class="invalid-feedback">
                         學號必填或學號格式錯誤
                     </div>
                 </div>
                 <div class="col-md-6">
                     <label for="college" class="form-label">學院<span style="color: red;">*</span></label>
-                    <select id="college" class="form-select" required>
+                    <select id="college" class="form-select" required {{ 'disabled' if user_info.verification else '' }}>
                         <option value="" selected disabled>請選擇學院</option>
                         <option value="教育學院">教育學院</option>
                         <option value="理學院">理學院</option>
@@ -84,7 +84,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="department" class="form-label">系所<span style="color: red;">*</span></label>
-                    <select id="department" class="form-select" required>
+                    <select id="department" class="form-select" required {{ 'disabled' if user_info.verification else '' }}>
                         <option value="" selected disabled>請選擇系所</option>
                     </select>
                     <div class="invalid-feedback">
@@ -93,7 +93,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="grade" class="form-label">年級<span style="color: red;">*</span></label>
-                    <select id="grade" class="form-select" required>
+                    <select id="grade" class="form-select" required {{ 'disabled' if user_info.verification else '' }}>
                         <option value="" selected disabled>請選擇年級</option>
                         <option value="大一">大一</option>
                         <option value="大二">大二</option>
@@ -229,13 +229,19 @@
                 type: 'POST',
                 data: data,
                 success: function (response) {
-                    liff.sendMessages([{
-                        type: 'text',
-                        text: response.message
-                    }])
-                    .then(() => {
-                        liff.closeWindow();
-                    });
+                    if (response.success) {
+                        liff.sendMessages([{
+                            type: 'text',
+                            text: response.message
+                        }])
+                        .then(() => {
+                            liff.closeWindow();
+                        });
+                    } else {
+                        alert(response.message);
+                        $('#submitBtn').show();
+                        $('#loadBtn').hide();
+                    }
                 },
                 error: function (error) {
                     console.log('error', error);
