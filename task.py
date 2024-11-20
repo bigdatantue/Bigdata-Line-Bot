@@ -811,12 +811,13 @@ class Quiz(Task):
         quiz_records_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_records'))
         quiz_questions_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_questions'))
 
-        # 判斷全服是否有任何答題紀錄（若每次釋出新的時quiz_records會是空的，操作空的DataFrame會報錯）
-        if quiz_records_df.empty:
-            return LineBotHelper.reply_message(event, [TextMessage(text='尚未有任何答題紀錄！')])
+        # 篩選該類別題目
+        quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
+        
+        # 判斷該類別是否有任何答題記錄（依據total_count欄位）
+        if quiz_questions_df['total_count'].sum() == 0:
+            return LineBotHelper.reply_message(event, [TextMessage(text=f'類別「{category}」尚未有任何答題記錄！')])
         else:
-            # 篩選同個類別主題的題目
-            quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
             # 為了避免兩個DataFrame欄位名稱重複，將quiz_questions的answer欄位改名為correct_answer
             quiz_questions_df = quiz_questions_df.rename(columns={'answer': 'correct_answer'})
             merged_df = pd.merge(quiz_records_df, quiz_questions_df, left_on='question_id', right_on='id', how='left')
