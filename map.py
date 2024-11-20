@@ -108,6 +108,7 @@ class DatabaseDocumentMap:
     }
     LINE_FLEX = {
         "menu": "menu",
+        "setting": "setting",
         "course": "course",
         "certificate": "certificate",
         "counseling": "counseling",
