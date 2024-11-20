@@ -63,11 +63,11 @@ class Setting(Template):
         
 class Course(Template):
     """
-    開課時間查詢
+    開課修業查詢
     """
     def execute(self, event, **kwargs):
-        quick_reply_data = firebaseService.get_data('quick_reply', DatabaseDocumentMap.QUICK_REPLY.get("course")).get("semester")
-        LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
+        line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("course")).get("select")
+        LineBotHelper.reply_message(event, [FlexMessage(alt_text='開課時間查詢', contents=FlexContainer.from_json(line_flex_str))])
 
 class Certificate(Template):
     """
@@ -102,6 +102,8 @@ class Equipment(Template):
     """
     def execute(self, event, **kwargs):
         line_flex_str = firebaseService.get_data('line_flex', DatabaseDocumentMap.LINE_FLEX.get("equipment")).get("select")
+        rent_url = f'https://liff.line.me/{LIFFSize.TALL.value}/rent?userId={event.source.user_id}'
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {'rent_url': rent_url})
         LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_str))])
 
 class Quiz(Template):

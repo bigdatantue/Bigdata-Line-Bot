@@ -14,6 +14,7 @@ import pytz
 from datetime import datetime
 import re
 import random
+import math
 
 config = Config()
 spreadsheetService = config.spreadsheetService
@@ -46,57 +47,132 @@ class TaskFactory:
 
 class Course(Task):
     """
-    開課時間查詢
+    開課修業查詢
     """
     def execute(self, event, params):
-        course_record_id = params.get('course_record')
-        course_category = params.get('category')
-
-        #如果有course_record_id，則回傳該課程的詳細資訊
-        if course_record_id:
-            course = __class__.__get_course_records(id=course_record_id)[0]
-            line_flex_template = firebaseService.get_data(
-                DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("course")
-            ).get('detail')
-            line_flex_str = LineBotHelper.replace_variable(line_flex_template, course)
-            
-            LineBotHelper.reply_message(event, [FlexMessage(alt_text='詳細說明', contents=FlexContainer.from_json(line_flex_str))])
-            return
-        
-        #否則如果有course_category，則回傳該類別的課程資訊
-        elif course_category:
-            course_map = Map.COURSE
-            # 拆解學年和學期
-            year = params.get('semester')[:3]
-            semester = params.get('semester')[3:]
-            courses = __class__.__get_course_records(year=year, semester=semester)
-            if course_category != 'overview':
-                courses = [course for course in courses if course.get('category') == course_map.get(course_category)]
-            if len(courses) == 0:
-                message = f'{year}學年度第{semester}學期沒有{course_map.get(course_category)}課程資料'
-                LineBotHelper.reply_message(event, [TextMessage(text=message)])
-            else:
-                line_flex_template = firebaseService.get_data(
-                    DatabaseCollectionMap.LINE_FLEX, 
-                    DatabaseDocumentMap.LINE_FLEX.get("course")
-                ).get('summary')
-                line_flex_json = FlexMessageHelper.create_carousel_bubbles(courses, json.loads(line_flex_template))
-                line_flex_str = json.dumps(line_flex_json)
-                LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=FlexContainer.from_json(line_flex_str))])
-            return
-        
-        #否則回傳課程類別的快速回覆選項
-        else:
+        type = params.get('type')
+        if type == 'open':
             quick_reply_data = firebaseService.get_data(
                 DatabaseCollectionMap.QUICK_REPLY,
                 DatabaseDocumentMap.QUICK_REPLY.get("course")
-            ).get("category")
-            for i, text in enumerate(quick_reply_data.get('actions')):
-                quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
+            ).get("semester")
             LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
-            return
+                
+        elif type == 'progress':
+            # 查詢修課進度
+            user_id = event.source.user_id
+            user_details = spreadsheetService.get_worksheet_data('user_details')
+            user_detail = next((user for user in user_details if user.get('user_id') == user_id), None)
+            # 確認使用者填完的資料是否已經認證
+            if not user_detail['verification']:
+                return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，並傳送學生證正面照片完成認證')])
+
+            user_student_id = user_detail['student_id']
+            user_courses = [course for course in spreadsheetService.get_worksheet_data('user_courses_records') if course.get('student_id') == user_student_id]
+            # 取得課程資料
+            courses_df = pd.DataFrame(spreadsheetService.get_worksheet_data('courses'))
+            courses_records_df = pd.DataFrame(spreadsheetService.get_worksheet_data('course_records'))
+            user_courses_df = pd.DataFrame(user_courses)
+            # 確認使用者是否修過此微學程的課程
+            if not user_courses:
+                df_merged = pd.merge(courses_df, courses_records_df, on='course_id', how='left').astype(str)
+                df_merged['semester'] = '-'
+                df_merged['credit'] = 0
+                df_merged['status'] = '未修畢'
+                df_merged['color'] = '#000000'
+            else:
+                df_temp = pd.merge(user_courses_df, courses_records_df, left_on='record_id', right_on='id', how='inner')
+
+                # 取得學生同課程最新的修課紀錄
+                df_temp['id'] = df_temp['id'].astype(int)
+                df_temp = df_temp.loc[df_temp.groupby("course_id")['id'].idxmax()]
+
+                df_merged = pd.merge(courses_df, df_temp, on='course_id', how='left')
+                df_merged[['status', 'color']] = df_merged.apply(lambda row: pd.Series(__class__.__get_study_status(row)), axis=1)
+                df_merged['semester'] = df_merged.apply(lambda row: f"{int(row['year'])}-{int(row['semester'])}" if pd.notna(row['year']) and pd.notna(row['semester']) else '-', axis=1)
+                df_merged['pass'] = pd.to_numeric(df_merged['pass']).fillna(0).astype(int)
+                df_merged['credit'] = pd.to_numeric(df_merged['credit']).fillna(0).astype(int)
+
+            # 取得line flex template以及替換修課資料變數
+            line_flex_template = firebaseService.get_data(
+                DatabaseCollectionMap.LINE_FLEX,
+                DatabaseDocumentMap.LINE_FLEX.get("course")
+            ).get('progress')
+            for course_record in df_merged.to_dict(orient='records'):
+                course_id = course_record['course_id']
+                variable_dict = { f"{key}{course_id}": course_record[key] for key in ['status', 'category', 'semester', 'color'] }
+                line_flex_template = LineBotHelper.replace_variable(line_flex_template, variable_dict)
+
+            # 建立替換學分數據的字典
+            completed_required_credit = df_merged[(df_merged['type'] == '必修') & df_merged['pass']]['credit'].sum()
+            incompleted_required_credit = max(6 - completed_required_credit, 0)
+            completed_elective_credit = df_merged[(df_merged['type'] == '選修') & df_merged['pass']]['credit'].sum()
+            incompleted_elective_credit = max(4 - completed_elective_credit, 0)
+            standard = '已達到發證標準' if incompleted_required_credit <= 0 and incompleted_elective_credit <= 0 else '尚未符合發證標準'
+            color = '#00BB00' if standard == '已達到發證標準' else '#FF0000'
+            credits_summary = {
+                'completed_required_credit': completed_required_credit,
+                'incompleted_required_credit': incompleted_required_credit,
+                'completed_elective_credit': completed_elective_credit,
+                'incompleted_elective_credit': incompleted_elective_credit,
+                'standard': standard,
+                'color': color
+            }
+
+            line_flex_str = LineBotHelper.replace_variable(line_flex_template, credits_summary)
+            return LineBotHelper.reply_message(event, [FlexMessage(alt_text='修課進度', contents=FlexContainer.from_json(line_flex_str))])
             
+        else:
+            course_record_id = params.get('course_record')
+            course_category = params.get('category')
+
+            #如果有course_record_id，則回傳該課程的詳細資訊
+            if course_record_id:
+                course = __class__.__get_course_records(id=course_record_id)[0]
+                line_flex_template = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("course")
+                ).get('detail')
+                line_flex_str = LineBotHelper.replace_variable(line_flex_template, course)
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='詳細說明', contents=FlexContainer.from_json(line_flex_str))])
+            
+            #否則如果有course_category，則回傳該類別的課程資訊
+            elif course_category:
+                course_map = Map.COURSE
+                # 拆解學年和學期
+                year = params.get('semester')[:3]
+                semester = params.get('semester')[3:]
+                courses = __class__.__get_course_records(year=year, semester=semester)
+                if course_category != 'overview':
+                    courses = [course for course in courses if course.get('category') == course_map.get(course_category)]
+                if len(courses) == 0:
+                    message = f'{year}學年度第{semester}學期沒有{course_map.get(course_category)}課程資料'
+                    LineBotHelper.reply_message(event, [TextMessage(text=message)])
+                else:
+                    line_flex_template = firebaseService.get_data(
+                        DatabaseCollectionMap.LINE_FLEX, 
+                        DatabaseDocumentMap.LINE_FLEX.get("course")
+                    ).get('summary')
+
+                    bubble_amount = 12
+                    flex_message_bubbles = []
+                    for i in range(math.ceil(len(courses) / bubble_amount)):
+                        temp = courses[i*bubble_amount:i*bubble_amount+bubble_amount] if i*bubble_amount+bubble_amount < len(courses) else courses[i*bubble_amount:]
+                        line_flex_json = FlexMessageHelper.create_carousel_bubbles(temp, json.loads(line_flex_template))
+                        line_flex_str = json.dumps(line_flex_json)
+                        flex_message_bubbles.append(FlexContainer.from_json(line_flex_str))
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=flex) for flex in flex_message_bubbles])
+            
+            #否則回傳課程類別的快速回覆選項
+            else:
+                quick_reply_data = firebaseService.get_data(
+                    DatabaseCollectionMap.QUICK_REPLY,
+                    DatabaseDocumentMap.QUICK_REPLY.get("course")
+                ).get("category")
+                for i, text in enumerate(quick_reply_data.get('actions')):
+                    quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
+                LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
+                return
 
     def __get_course_records(id=None, year=None, semester=None):
         """Returns
@@ -120,6 +196,18 @@ class Course(Task):
         elif year and semester:
             merged_data = merged_data[(merged_data['year'] == year) & (merged_data['semester'] == semester)]
         return merged_data.to_dict(orient='records')
+
+    def __get_study_status(row):
+        """Returns
+        str: 學生修課狀態以及對應的顏色
+        """
+        if pd.notna(row['student_id']):
+            if row['pass'] == 1:
+                return '已修畢', '#00BB00'
+            else:
+                return '未通過', '#FF0000'
+        else:
+            return '未修畢', '#000000'
     
 class Communtity(Task):
     """
@@ -153,7 +241,6 @@ class Equipment(Task):
     """
     def execute(self, event, params):
         user_id = event.source.user_id
-        user_msg = params.get('user_msg')
         decision = params.get('decision')
         if decision:
             borrower_user_id = params.get('borrower_user_id')
@@ -181,130 +268,9 @@ class Equipment(Task):
                 LineBotHelper.reply_message(event, [TextMessage(text='設備租借不通過')])
                 LineBotHelper.push_message(borrower_user_id, [TextMessage(text='設備租借不通過')])
                 return
-        if user_msg:
-            # 如果有使用者輸入文字，則進入填寫借用人資料流程
-            borrower_info = firebaseService.get_data(DatabaseCollectionMap.TEMP, user_id)
-            prompts = ['請輸入系所班級', '請輸入email', '請輸入手機號碼', '已送出租借申請']
-            keys = ['name', 'department', 'email', 'phone']
-            for key, prompt in zip(keys, prompts):
-                if key not in borrower_info['borrowerData']:
-                    if key == 'email' and not __class__.__check_email(user_msg):
-                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入正確的email格式')])
-                    elif key == 'phone' and not __class__.__check_phone(user_msg):
-                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入正確的手機號碼格式')])
-                    borrower_info['borrowerData'][key] = user_msg
-                    firebaseService.update_data(DatabaseCollectionMap.TEMP, user_id, borrower_info)
-                    if key == 'phone':
-                        # 最後一個資料輸入完畢，進行設備租借
-                        user_info_data = spreadsheetService.get_worksheet_data('user_info')
-                        user_info_data = [user for user in user_info_data if user.get('permission') >= Permission.LEADER]
-                        user_ids = [user.get('user_id') for user in user_info_data]
-                        line_flex_str = firebaseService.get_data(
-                            DatabaseCollectionMap.LINE_FLEX,
-                            DatabaseDocumentMap.LINE_FLEX.get("equipment")
-                        ).get("approve")
-                        items = {
-                            'equipment_name': Map.EQUIPMENT_NAME.get(int(borrower_info['equipment_id'])),
-                            'borrower_user_id': user_id,
-                            'name': borrower_info['borrowerData']['name'],
-                            'borrower_department': borrower_info['borrowerData']['department'],
-                            'borrower_email': borrower_info['borrowerData']['email'],
-                            'borrower_phone': borrower_info['borrowerData']['phone'],
-                            'amount': borrower_info['amount'],
-                            'start_date': borrower_info['startDate'],
-                            'pickup_time': borrower_info['selectedTime'],
-                            'end_date': borrower_info['endDate'],
-                            'return_time': borrower_info['returnTime']
-                        }
-                        line_flex_str = LineBotHelper.replace_variable(line_flex_str, items)
-                        LineBotHelper.multicast_message(user_ids, [FlexMessage(alt_text='租借申請確認', contents=FlexContainer.from_json(line_flex_str))])
-                    return LineBotHelper.reply_message(event, [TextMessage(text=prompt)])
         else:
             type = params.get('type')
-            if type == 'borrow':
-                equipment_id = params.get('equipment_id')
-                amount = params.get('amount')
-                confirmed = params.get('status') == 'confirm'
-                if confirmed:
-                    # 送出租借資訊
-                    start_date = params.get('start_date')
-                    pickup_time = params.get('pickup_time')
-                    end_date = params.get('end_date')
-                    return_time = params.get('return_time')
-                    data = {
-                        'task': 'equipment',
-                        'equipment_id': equipment_id,
-                        'amount': params.get('amount'),
-                        'startDate': start_date,
-                        'selectedTime': pickup_time,
-                        'endDate': end_date,
-                        'returnTime': return_time,
-                        'borrower': user_id,
-                        'borrowerData': {}
-                    }
-                    is_valid, error_msg = __class__.__check_borrow_data(start_date.replace(' ',''), pickup_time.replace(' ',''), end_date.replace(' ',''), return_time.replace(' ',''))
-                    if is_valid:
-                        firebaseService.add_data(DatabaseCollectionMap.TEMP, user_id, data)
-                        return LineBotHelper.reply_message(event, [TextMessage(text='請輸入借用人姓名')])
-                    else:
-                        return LineBotHelper.reply_message(event, [TextMessage(text=error_msg)])
-                elif amount:
-                    # 編輯租借資訊
-                    item = params.get('item')
-                    line_flex_template = firebaseService.get_data(
-                        DatabaseCollectionMap.LINE_FLEX,
-                        DatabaseDocumentMap.LINE_FLEX.get("equipment")
-                    ).get("confirm")
-                    items = {
-                        'equipment_id': equipment_id,
-                        'equipment_name': Map.EQUIPMENT_NAME.get(int(equipment_id)),
-                        'amount': amount,
-                        'start_date': params.get('start_date', ' '),
-                        'pickup_time': params.get('pickup_time', ' '),
-                        'end_date': params.get('end_date', ' '),
-                        'return_time': params.get('return_time', ' ')
-                    }
-                    # 重新設定使用者修改的欄位
-                    items[item] = params.get('date') if item == 'start_date' or item == 'end_date' else params.get('time')
-                    
-                    line_flex_str = LineBotHelper.replace_variable(line_flex_template, items)
-                    return LineBotHelper.reply_message(event, [FlexMessage(alt_text='確認租借', contents=FlexContainer.from_json(line_flex_str))])
-                elif equipment_id:
-                    # 選擇租借數量
-                    quick_reply_data = firebaseService.get_data(
-                        DatabaseCollectionMap.QUICK_REPLY,
-                        DatabaseDocumentMap.QUICK_REPLY.get("equipment")
-                    ).get("amount")
-                    for i, text in enumerate(quick_reply_data.get('actions')):
-                        quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
-                    return LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
-                else:
-                    # 選擇租借設備
-                    equipments = spreadsheetService.get_worksheet_data('equipments')
-
-                    for i in range(len(equipments)):
-                        equipment_id = equipments[i].get('equipment_id')
-                        
-                        total_conditions = [('type', '==', equipment_id)]
-                        total_amount = len(firebaseService.filter_data('equipments', total_conditions))
-                        lend_conditions = [
-                            ('type', '==', equipment_id),
-                            ('status', '==', EquipmentStatus.LEND)
-                        ]
-                        lend_amount = len(firebaseService.filter_data('equipments', lend_conditions))
-                        
-                        # 更新設備資訊
-                        equipments[i]['total_amount'] = total_amount
-                        equipments[i]['lend_amount'] = lend_amount
-                        equipments[i]['available_amount'] = total_amount - lend_amount
-                    line_flex_template = firebaseService.get_data(
-                        DatabaseCollectionMap.LINE_FLEX,
-                        DatabaseDocumentMap.LINE_FLEX.get("equipment")
-                    ).get("equipment_summary")
-                    line_flex_template = FlexMessageHelper.create_carousel_bubbles(equipments, json.loads(line_flex_template))
-                    line_flex_template = json.dumps(line_flex_template)
-                    return LineBotHelper.reply_message(event, [FlexMessage(alt_text='設備租借', contents=FlexContainer.from_json(line_flex_template))])
-            else:
+            if type != 'borrow':
                 # 查詢借用清單
                 borrow_records = __class__.__get_borrow_records(user_id)
                 if len(borrow_records) == 0:
@@ -318,35 +284,6 @@ class Equipment(Task):
                 line_flex_str = json.dumps(line_flex_json)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='借用清單', contents=FlexContainer.from_json(line_flex_str))])
 
-    def __check_borrow_data(start_date, pickup_time, end_date, return_time):
-        """Returns
-        Tuple[bool, str]: 是否合法, 錯誤訊息
-        """
-        if start_date and pickup_time and end_date and return_time:
-            # 檢查借用結束日期是否大於借用開始日期
-            start_datetime = datetime.strptime(f'{start_date} {pickup_time}', '%Y-%m-%d %H:%M')
-            end_datetime = datetime.strptime(f'{end_date} {return_time}', '%Y-%m-%d %H:%M')
-            if start_datetime >= end_datetime:
-                return False, '借用結束日期時間需大於借用開始日期時間'
-            else:
-                return True, ''
-        else:
-            return False, '請填寫完整借用資訊'
-
-    def __check_email(email: str):
-        """Returns
-        bool: email格式是否合法
-        """
-        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
-        return re.fullmatch(regex, email)
-    
-    def __check_phone(phone: str):
-        """Returns 
-        bool: 手機號碼格式是否合法
-        """
-        regex = r'^09\d{8}$'
-        return re.fullmatch(regex, phone)
-    
     def __rent_equipment(params: dict):
         """租借設備(更新資料庫)
         Returns
@@ -360,15 +297,21 @@ class Equipment(Task):
         # 隨機產生id
         borrower_id = LineBotHelper.generate_id()
         # 更新設備狀態
+        # 為何要修改這邊的名稱呢？不直接在LIFF_APP中修改？
+        # 因為LIFF_APP要發送Flex Message的變數名稱有底線的形式，所以只能在這裡配合修改
         for equipment in equipment_status_data[:int(params.get('amount'))]:
             equipment['borrowerId'] = borrower_id
             equipment['borrower'] = params.get('borrower')
             equipment['status'] = EquipmentStatus.LEND
-            equipment['startDate'] = params.get('startDate')
-            equipment['selectedTime'] = params.get('selectedTime')
-            equipment['endDate'] = params.get('endDate')
-            equipment['returnTime'] = params.get('returnTime')
-            equipment['borrowerData'] = params.get('borrowerData')
+            equipment['startDate'] = params.get('start_date')
+            equipment['endDate'] = params.get('end_date')
+            equipment['returnTime'] = params.get('return_time')
+            equipment['borrowerData'] = {
+                'department': params.get('borrower_department'),
+                'email': params.get('borrower_email'),
+                'name': params.get('name'),
+                'phone': params.get('borrower_phone')
+            }
             firebaseService.update_data('equipments', equipment.get('_id'), equipment)
         return borrower_id
     
@@ -411,6 +354,8 @@ class Quiz(Task):
     """
     知識測驗
     """
+    gold_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
+    gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
     def execute(self, event, params):
         user_id = event.source.user_id
         question_no = params.get('no')
@@ -472,6 +417,8 @@ class Quiz(Task):
         else:
             # 進行測驗
             mode = params.get('mode')
+            type = params.get('type')
+            question_id = params.get('id')
             category = params.get('category')
             competition_id = params.get('competition_id')
             quiz_flex_datas = spreadsheetService.get_worksheet_data('quizzes')
@@ -479,8 +426,16 @@ class Quiz(Task):
                 # 排行榜
                 rank_line_flex_str = __class__.__generate_rank_line_flex(competition_id, user_id)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='排行榜', contents=FlexContainer.from_json(rank_line_flex_str))])
-            elif mode == 'history':
-                return LineBotHelper.reply_message(event, [TextMessage(text='敬請期待')])
+            elif mode == 'history' and not question_id:
+                if type == 'user':
+                    return __class__.__generate_personal_history_question(event, category, user_id)
+                elif type == 'all':
+                    return __class__.__generate_global_history_question(event, category)
+                else:
+                    return __class__.__generate_history_select(event, category)
+            elif mode == 'history' and question_id:
+                return __class__.__generate_complete_history_question(event, question_id)
+
             elif mode == 'competition_rule':
                 # 測驗說明
                 line_flex_str = firebaseService.get_data(
@@ -566,9 +521,6 @@ class Quiz(Task):
         """Returns
         生成題目的Line Flex
         """
-        gold_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png"
-        gray_star_url = "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gray_star_28.png"
-
         question.update({
             'quiz_id': quiz_id,
             'no': question_no + 1,
@@ -583,8 +535,8 @@ class Quiz(Task):
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
         # 生成星星
         difficulty = int(question.get('difficulty'))
-        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gold_star_url}, difficulty)
-        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": gray_star_url}, 5 - difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gold_star_url}, difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gray_star_url}, 5 - difficulty)
         return line_flex_str
     
     def __generate_answer_line_flex(question: dict, is_correct: bool):
@@ -807,6 +759,139 @@ class Quiz(Task):
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
                 break
         return line_flex_str
+
+    def __generate_history_select(event, category):
+        """Return
+        使用者點擊歷史答題功能後，生成讓使用者選擇「我的錯題」和「全服錯題」選項的Flex Message
+        """
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        ).get('history_select')
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"category" : category})
+        return LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇查看範圍', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_global_history_question(event, category):
+        """Return
+        生成「全服錯題」的Carousel，包含全服答錯率最高的十題
+        """
+        quiz_questions = spreadsheetService.get_worksheet_data('quiz_questions')
+        # 過濾掉回答數為0、且為同個類別主題的題目
+        filtered_questions = [q for q in quiz_questions if q['category'] == category and float(q['total_count']) != 0]
+        if not filtered_questions:
+            return LineBotHelper.reply_message(event, [TextMessage(text='全服尚未有任何答題紀錄！')])
+        else:
+            # 根據正確率排序並選取前10個題目（正確率最低的前十題）
+            sorted_questions = sorted(filtered_questions, key=lambda x: float(x['correct_rate']))[:10]
+
+            # 生成carousel bubble
+            line_flex_str = firebaseService.get_data(
+                DatabaseCollectionMap.LINE_FLEX,
+                DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            ).get('history_question_list')
+
+            for question in sorted_questions:
+                question['width'] = 100 - question['correct_rate']
+                difficulty = int(question['difficulty'])
+
+                # 根據難度逐個替換 star_url
+                for i in range(difficulty):
+                    question[f'star_url_{i+1}'] = __class__.gold_star_url  # 替換金色星星
+                for i in range(5 - difficulty):
+                    question[f'star_url_{difficulty + i + 1}'] = __class__.gray_star_url  # 替換灰色星星
+
+            line_flex_str = FlexMessageHelper.create_carousel_bubbles(sorted_questions, json.loads(line_flex_str))
+            line_flex_str = json.dumps(line_flex_str)
+            return LineBotHelper.reply_message(event, [FlexMessage(alt_text='全服答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_personal_history_question(event, category, user_id):
+        """Return
+        生成「我的錯題」的Carousel，包含個人答錯率最高的十題
+        """
+        quiz_records_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_records'))
+        quiz_questions_df = pd.DataFrame(spreadsheetService.get_worksheet_data('quiz_questions'))
+
+        # 篩選該類別題目
+        quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
+        
+        # 判斷該類別是否有任何答題記錄（依據total_count欄位）
+        if quiz_questions_df['total_count'].sum() == 0:
+            return LineBotHelper.reply_message(event, [TextMessage(text=f'類別「{category}」尚未有任何答題記錄！')])
+        else:
+            # 為了避免兩個DataFrame欄位名稱重複，將quiz_questions的answer欄位改名為correct_answer
+            quiz_questions_df = quiz_questions_df.rename(columns={'answer': 'correct_answer'})
+            merged_df = pd.merge(quiz_records_df, quiz_questions_df, left_on='question_id', right_on='id', how='left')
+
+            # 選取user_id為user_id的資料（該使用者個人的答題資料）
+            user_records_df = merged_df[merged_df['user_id'] == user_id]
+
+            # 判斷使用者是否有作答過任何題目（是否在quiz_records中有該使用者的答題記錄）
+            if user_records_df.empty:
+                return LineBotHelper.reply_message(event, [TextMessage(text='您尚未作答過任何題目！')])
+            else:
+                # 新增is_correct欄位，判斷使用者的答案是否正確
+                user_records_df['is_correct'] = user_records_df.apply(
+                    lambda row: 1 if row['answer'].lower() == row['correct_answer'].lower() else 0, axis=1
+                )
+
+                # 計算每個題目的答題次數和答對次數
+                question_stats = user_records_df.groupby('question_id').agg(
+                    total_attempts=('question_id', 'size'),
+                    correct_attempts=('is_correct', 'sum')
+                ).reset_index()
+
+                # 計算每個題目的答對率
+                question_stats['personal_correct_rate'] = (question_stats['correct_attempts'] / question_stats['total_attempts']) * 100
+
+                # 合併question_stats和quiz_questions，並選取personal_correct_rate最低的前10個題目
+                ten_questions_df = pd.merge(question_stats, quiz_questions_df, left_on='question_id', right_on='id', how='left').sort_values(by='personal_correct_rate').head(10)
+                
+                # 加入width欄位
+                ten_questions_df['width'] = 100 - ten_questions_df['correct_rate']  # 以正確率計算錯誤率並存入
+                # 加入star_url欄位，根據difficulty計算
+                for i, row in ten_questions_df.iterrows():
+                    difficulty = int(row['difficulty'])
+
+                    # 生成星星列表
+                    star_urls = [__class__.gold_star_url] * difficulty + [__class__.gray_star_url] * (5 - difficulty)
+
+                    # 將star_url列表中的每個URL存入對應的欄位
+                    for index, star_url in enumerate(star_urls):
+                        ten_questions_df.at[i, f'star_url_{index + 1}'] = star_url
+
+                # 抓模板
+                line_flex_str = firebaseService.get_data(
+                    DatabaseCollectionMap.LINE_FLEX,
+                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                ).get('history_question_list')
+
+                # 生成carousel bubble
+                line_flex_str = FlexMessageHelper.create_carousel_bubbles(ten_questions_df.to_dict('records'), json.loads(line_flex_str))
+                line_flex_str = json.dumps(line_flex_str)
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='個人答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+
+    def __generate_complete_history_question(event, question_id):
+        """Return
+        生成完整測驗題目的Flex Message（包含答案）
+        """
+        quiz_questions = spreadsheetService.get_worksheet_data('quiz_questions')
+
+        # 只提取id == question_id的題目資料
+        quiz_question = [question for question in quiz_questions if question.get('id') == int(question_id)][0]
+
+        # 生成題目的Line Flex
+        line_flex_str = firebaseService.get_data(
+            DatabaseCollectionMap.LINE_FLEX,
+            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+        ).get('history_question_with_image' if quiz_question.get('image_url') else 'history_question')
+        quiz_question['width'] = 100 - quiz_question['correct_rate']
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, quiz_question)
+
+        # 生成星星
+        difficulty = int(quiz_question['difficulty'])
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gold_star_url}, difficulty)
+        line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"star_url": __class__.gray_star_url}, 5 - difficulty)
+        return LineBotHelper.reply_message(event, [FlexMessage(alt_text='完整測驗題目', contents=FlexContainer.from_json(line_flex_str))])
 
 class FAQ(Task):
     """

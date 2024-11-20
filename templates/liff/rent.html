@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}設備租借{% endblock %}
+{% block content %}
+  <div class="container mt-4">
+    <h3 class="text-center mb-4">設備租借表單</h3>
+    <form class="needs-validation" id="rentalForm" novalidate>
+      <!-- 個人資訊 -->
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="borrowerName" class="form-label">姓名 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="borrowerName" value="{{ user_info.name }}" placeholder="請輸入姓名" required/>
+          <div class="invalid-feedback">請輸入姓名</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="department" class="form-label">系級 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="department" value="{{ user_info.department }}{{ user_info.grade }}" placeholder="請輸入系級" required/>
+          <div class="invalid-feedback">請輸入系級</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="phone" class="form-label">手機號碼 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="phone" value="{{ user_info.phone }}" placeholder="請輸入手機號碼" required/>
+          <div class="invalid-feedback">請輸入正確的手機號碼</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+          <input type="email" class="form-control" id="email" value="{{ user_info.email }}" placeholder="請輸入Email" required/>
+          <div class="invalid-feedback">請輸入有效的Email</div>
+        </div>
+      </div>
+
+      <!-- 租借設備 -->
+      <hr class="my-4" />
+      <h5 class="mb-3">租借設備</h5>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="equipmentName" class="form-label">設備 <span class="text-danger">*</span></label>
+          <select class="form-select" id="equipmentName" required>
+            <option selected disabled value="">請選擇要租借的設備</option>
+            {% for equipment in equipments %}
+            <option value="{{ equipment.equipment_name }}" data-id="{{ equipment.equipment_id }}" data-available="{{ equipment.available_amount }}">
+              {{ equipment.equipment_name }}（剩餘 {{ equipment.available_amount }} 台可借）
+            </option>
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback">請選擇設備</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="equipmentAmount" class="form-label">數量 <span class="text-danger">*</span></label>
+          <select class="form-select" id="equipmentAmount" required>
+            <option selected disabled value="">請選擇要租借的數量</option>
+            <!-- 動態生成數量選項 -->
+          </select>
+          <div class="invalid-feedback">請選擇數量</div>
+        </div>
+      </div>
+
+      <!-- 日期與時間選擇 -->
+      <hr class="my-4" />
+      <h5 class="mb-3">租借日期與時間</h5>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="startDate" class="form-label">借用日期 <span class="text-danger">*</span></label>
+          <input type="date" class="form-control" id="startDate" required/>
+          <div class="invalid-feedback">請選擇借用日期</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="pickupTime" class="form-label">取件時間 <span class="text-danger">*</span></label>
+          <input type="time" class="form-control" id="pickupTime" required/>
+          <div class="invalid-feedback">請選擇取件時間</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="endDate" class="form-label">歸還日期 <span class="text-danger">*</span></label>
+          <input type="date" class="form-control" id="endDate" required/>
+          <div class="invalid-feedback">請選擇歸還日期</div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="returnTime" class="form-label">歸還時間 <span class="text-danger">*</span></label>
+          <input type="time" class="form-control" id="returnTime" required/>
+          <div class="invalid-feedback">請選擇歸還時間</div>
+        </div>
+      </div>
+
+      <!-- 提交按鈕 -->
+      <div class="d-flex justify-content-end mt-4">
+        <button class="btn btn-success me-2" id="submitBtn">送出</button>
+        <button class="btn btn-success" id="loadBtn" type="button" disabled style="display: none;">
+          <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          處理中...
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script>
+    let user_id;
+
+    $(document).ready(function () {
+      initializeLiff('{{ liff_id }}');
+
+      const today = new Date().toISOString().split('T')[0];
+      // 設定借用日期最小值為今天
+      $('#startDate').attr('min', today);
+      // 禁用歸還日期，直到選擇借用日期
+      $('#endDate').attr('disabled', true);
+    
+      // 檢查借用日期是否晚於今天
+      $('#startDate').change(function() {
+        const borrowDate = $(this).val();
+        // 清空不合法的借用日期
+        if (today > borrowDate) {
+          alert('借用日期不可早於今天');
+          $(this).val('');
+        } else {
+          $('#endDate').attr('disabled', false);
+          $('#endDate').attr('min', borrowDate); 
+        }
+      });
+
+      // 檢查歸還日期是否早於借用日期
+      $('#endDate').change(function() {
+        const borrowDate = $('#startDate').val();
+        const returnDate = $(this).val();
+        if (returnDate < borrowDate) {
+          alert('歸還日期不能早於借用日期');
+          $(this).val('');
+        }
+      });
+
+      // 根據設備選擇動態更新「數量」選項
+      $('#equipmentName').change(function() {
+        const selectedEquipment = $(this).find('option:selected');
+        const availableAmount = parseInt(selectedEquipment.data('available'));
+
+        const amountSelect = $('#equipmentAmount');
+        amountSelect.empty();
+        amountSelect.append('<option selected disabled value="">請選擇要租借的數量</option>');
+
+        for (let i = 1; i <= availableAmount; i++) {
+          amountSelect.append(`<option value="${i}">${i}</option>`);
+        }
+      });
+
+      // 驗證 email 和手機號碼格式
+      function validateEmail(email) {
+        const regex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/;
+        return regex.test(email);
+      }
+
+      function validatePhone(phone) {
+        const regex = /^09\d{8}$/;
+        return regex.test(phone);
+      }
+
+      // 提交表單
+      $('#rentalForm').submit(function (e) {
+        e.preventDefault();
+        
+        const email = $('#email').val();
+        const phone = $('#phone').val();
+      
+        if (!validateEmail(email)) {
+          alert('請輸入有效的Email');
+          return;
+        }
+      
+        if (!validatePhone(phone)) {
+          alert('請輸入有效的手機號碼');
+          return;
+        }
+
+        // 驗證表單
+        if (!this.checkValidity()) {
+          e.stopPropagation();
+          $(this).addClass('was-validated');
+          return;
+        }
+        $('#submitBtn').hide();
+        $('#loadBtn').show();
+        
+        // 收集表單資料
+        const data = {
+          userId: user_id,
+          borrowerName: $('#borrowerName').val(),
+          department: $('#department').val(),
+          phone: $('#phone').val(),
+          email: $('#email').val(),
+          equipmentName: $('#equipmentName').val(),
+          equipmentId: $('#equipmentName option:selected').data('id'),
+          equipmentAmount: $('#equipmentAmount').val(),
+          startDate: $('#startDate').val(),
+          endDate: $('#endDate').val(),
+          pickupTime: $('#pickupTime').val(),
+          returnTime: $('#returnTime').val()
+        };
+
+        $.ajax({
+          url: location.origin + "/liff/rent",
+          type: 'POST',
+          data: data,
+          success: function (response) {
+            liff.sendMessages([{
+              type: 'text',
+              text: response.message
+            }])
+            .then(() => {
+              liff.closeWindow();
+            });
+          },
+          error: function (error) {
+            console.log('error', error);
+          }
+        });
+      });
+
+      // 初始化 LIFF
+      function initializeLiff(liffId) {
+        liff.init({ liffId: liffId }).then(() => {
+          if (!liff.isLoggedIn()) {
+            liff.login();
+          } else {
+            liff.getProfile().then(profile => {
+              user_id = profile.userId;
+            }).catch(err => {
+              console.log('error', err);
+            });
+          }
+        }).catch(err => {
+          console.log('初始化失敗', err);
+        });
+      }
+    });
+  </script>
+{% endblock %}
