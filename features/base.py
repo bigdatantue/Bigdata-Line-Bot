@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Type, Optional
 from config import Config
-from api.spreadsheet import SpreadsheetService
 from api.firebase import FireBaseService
 
 class Feature(ABC):
     config: Config = Config()
-    spreadsheetService: SpreadsheetService = config.spreadsheetService
     firebaseService: FireBaseService = config.firebaseService
 
     @abstractmethod

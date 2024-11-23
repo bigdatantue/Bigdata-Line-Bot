@@ -1,5 +1,5 @@
 from config import Config
-from map import DatabaseCollectionMap, DatabaseDocumentMap
+from map import DatabaseCollectionMap
 from linebot.v3.messaging import (
     ApiClient,
     ApiException,
@@ -33,13 +33,12 @@ firebaseService = config.firebaseService
 class LineBotHelper:
     @staticmethod
     def get_user_info(user_id: str):
-        """Returns 使用者資訊
-        list: [使用者名稱, 使用者大頭貼, 使用者語系, 使用者狀態訊息]
+        """Returns
+        dict: 使用者資訊
         """
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
-            user_info = line_bot_api.get_profile(user_id)
-            return [user_info.display_name, user_info.picture_url, user_info.language, user_info.status_message]
+            return line_bot_api.get_profile(user_id).to_dict()
 
     @staticmethod
     def check_is_fixing():
@@ -48,7 +47,7 @@ class LineBotHelper:
         """
         return firebaseService.get_data(
             DatabaseCollectionMap.CONFIG,
-            DatabaseDocumentMap.CONFIG.get('system')
+            'system'
         ).get('fixing', False)
 
     @staticmethod
@@ -214,29 +213,29 @@ class RichMenuHelper:
             line_bot_api.create_rich_menu_alias(alias)
 
     @staticmethod
-    def create_rich_menu_(menu_type, alias_id):
+    def create_rich_menu_(alias_id):
         with ApiClient(configuration) as api_client:
             line_bot_api = MessagingApi(api_client)
             line_bot_blob_api = MessagingApiBlob(api_client)
             # 設定 rich menu image
             rich_menu_str = firebaseService.get_data(
                 DatabaseCollectionMap.RICH_MENU,
-                DatabaseDocumentMap.RICH_MENU.get(menu_type)
+                alias_id
             ).get('richmenu')
             rich_menu_id = line_bot_api.create_rich_menu(
                 rich_menu_request=RichMenuRequest.from_json(rich_menu_str)
             ).rich_menu_id
             rich_menu_url = firebaseService.get_data(
                 DatabaseCollectionMap.RICH_MENU,
-                DatabaseDocumentMap.RICH_MENU.get(menu_type)
+                alias_id
             ).get('image_url')
             __class__.set_rich_menu_image_(rich_menu_id, rich_menu_url)
             __class__.create_rich_menu_alias_(alias_id, rich_menu_id)
 
 #-----------------以下為設定rich menu的程式-----------------
 # 設定rich menu，並將alias id為page1的rich menu設為預設
-# RichMenuHelper.create_rich_menu_('a', 'page1')
-# RichMenuHelper.create_rich_menu_('b', 'page2')
+# RichMenuHelper.create_rich_menu_('page1')
+# RichMenuHelper.create_rich_menu_('page2')
 # with ApiClient(configuration) as api_client:
 #     line_bot_api = MessagingApi(api_client)
 #     line_bot_api.set_default_rich_menu(line_bot_api.get_rich_menu_alias('page1').rich_menu_id)
@@ -248,49 +247,6 @@ class RichMenuHelper:
 #     for richmenu in richmenu_list.richmenus:
 #         richmenu_id = richmenu.rich_menu_id
 #         line_bot_api.delete_rich_menu(richmenu_id)
-
-#-----------------以下為sdk提供的方法-----------------
-# with ApiClient(configuration) as api_client:
-#     line_bot_api = MessagingApi(api_client)
-#     line_bot_api_blob = MessagingApiBlob(api_client)
-#     # CRUD of rich menu
-#     line_bot_api.create_rich_menu(
-#         rich_menu_request=RichMenuRequest.from_json(firebaseService.get_data(
-#                 DatabaseCollectionMap.RICH_MENU,
-#                 DatabaseDocumentMap.RICH_MENU.get('a')
-#         ).get('richmenu'))
-#     ).rich_menu_id
-#     line_bot_api.get_rich_menu('a')
-#     line_bot_api.get_rich_menu_list()
-#     line_bot_api.set_default_rich_menu('a')
-#     line_bot_api.delete_rich_menu('a')
-#     # CRUD of rich menu alias
-#     line_bot_api.create_rich_menu_alias(
-#         CreateRichMenuAliasRequest(
-#             richMenuAliasId='page1',
-#             richMenuId='a'
-#         )
-#     )
-#     line_bot_api.get_rich_menu_alias('page1')
-#     line_bot_api.get_rich_menu_alias_list()
-#     line_bot_api.update_rich_menu_alias(
-#         'page1',
-#         CreateRichMenuAliasRequest(richMenuAliasId='page1', richMenuId='a')
-#     )
-#     line_bot_api.delete_rich_menu_alias('page1')
-#     # CRUD of rich menu image
-#     line_bot_api_blob.get_rich_menu_image('a')
-#     response = requests.get(firebaseService.get_data(
-#         DatabaseCollectionMap.RICH_MENU,
-#         DatabaseDocumentMap.RICH_MENU.get('a')
-#     ).get('image_url'))
-#     image_content = response.content
-#     headers = {'Content-Type': 'image/png'}
-#     line_bot_api_blob.set_rich_menu_image(
-#         rich_menu_id='richmenu-c88b6b533abd76ac9068cf5296720e60',
-#         body=image_content,
-#         _headers=headers
-#     )
     
 class QuickReplyHelper:
     @staticmethod

@@ -32,6 +32,14 @@ class EquipmentType(IntEnum):
     # ALK950 邊緣運算推論器
     ALK = 3
 
+class EquipmentName(Enum):
+    """
+    設備名稱
+    """
+    AI = '小栗方 AI 學習機'
+    VIA = 'VIA Pixetto 視覺感測器'
+    ALK = 'ALK950 邊緣運算推論器'
+
 class Permission(IntEnum):
     """
     權限
@@ -69,21 +77,10 @@ class Map:
         '課程諮詢建議': 'counseling',
         '社群學習資源': 'community',
         '設備租借': 'equipment',
-        '計畫成果展示': 'gallery',
+        '活動資訊': 'activity',
         '知識測驗': 'quiz'
     }        
     FAQ_SET = set({'課程內容', '學分與證書', '選課相關', '學習輔導', '活動消息'})
-    COURSE = {
-        'overview': '總覽',
-        'basic': '基礎',
-        'advanced': '進階',
-        'practical': '實務'
-    }
-    EQUIPMENT_NAME = {
-        EquipmentType.AI: '小栗方 AI 學習機',
-        EquipmentType.VIA: 'VIA Pixetto 視覺感測器',
-        EquipmentType.ALK: 'ALK950 邊緣運算推論器'
-    }
 
 class DatabaseCollectionMap:
     """
@@ -94,30 +91,16 @@ class DatabaseCollectionMap:
     LINE_FLEX = "line_flex"
     QUICK_REPLY = "quick_reply"
     TEMP = "temp"
-
-class DatabaseDocumentMap:
-    """
-    Map資料庫Document名稱
-    """
-    CONFIG = {
-        "system": "system"
-    }
-    RICH_MENU = {
-        "a": "page1",
-        "b": "page2"
-    }
-    LINE_FLEX = {
-        "menu": "menu",
-        "setting": "setting",
-        "course": "course",
-        "certificate": "certificate",
-        "counseling": "counseling",
-        "community": "community",
-        "equipment": "equipment",
-        "quiz": "quiz",
-        "faq": "faq"
-    }
-    QUICK_REPLY = {
-        "course": "course",
-        "equipment": "equipment"
-    }
+    USER = "users"
+    COURSE = "courses"
+    COURSE_OPEN = "course_open_records"
+    COURSE_STUDY = "course_study_records"
+    MICROCOURSE = "microcourses"
+    EQUIPMENT = "equipments"
+    FAQ = "faqs"
+    FAQ_QUESTION = "faq_questions"
+    QUIZ = "quizzes"
+    QUIZ_QUESTION = "quiz_questions"
+    QUIZ_RECORD = "quiz_records"
+    QUIZ_LOG = "quiz_logs"
+    COMPETITION = "competitions"

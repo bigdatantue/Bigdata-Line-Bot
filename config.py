@@ -6,9 +6,9 @@ from linebot.v3 import (
 from linebot.v3.messaging import (
     Configuration
 )
-import pygsheets
 import json
-from api.spreadsheet import SpreadsheetService
+# import pygsheets
+# from api.spreadsheet import SpreadsheetService
 from api.firebase import FireBaseService
 from api.line_notify import LineNotifyService
 from map import FeatureStatus
@@ -59,7 +59,7 @@ class Config(metaclass=Singleton):
         """初始化LINE Bot相關物件"""
         self.handler = WebhookHandler(self.CHANNEL_SECRET)
         self.configuration = Configuration(access_token=self.CHANNEL_ACCESS_TOKEN)
-        self.spreadsheetService = SpreadsheetService(pygsheets.authorize(service_account_env_var='GDRIVE_API_CREDENTIALS'), self.SPREADSHEET_URL)
+        # self.spreadsheetService = SpreadsheetService(pygsheets.authorize(service_account_env_var='GDRIVE_API_CREDENTIALS'), self.SPREADSHEET_URL)
         self.firebaseService = FireBaseService(json.loads(self.FIREBASE_CREDENTIALS))
         self.lineNotifyService = LineNotifyService(self.LINE_NOTIFY_CLIENT_ID, self.LINE_NOTIFY_CLIENT_SECRET)
     
@@ -73,6 +73,6 @@ class Config(metaclass=Singleton):
             'counseling': FeatureStatus.ENABLE,
             'community': FeatureStatus.ENABLE,
             'equipment': FeatureStatus.ENABLE,
-            'gallery': FeatureStatus.DISABLE,
+            'activity': FeatureStatus.DISABLE,
             'quiz': FeatureStatus.ENABLE
         }

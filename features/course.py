@@ -5,7 +5,7 @@ from linebot.v3.messaging import (
     FlexContainer
 )
 from api.linebot_helper import LineBotHelper, QuickReplyHelper, FlexMessageHelper
-from map import Map, DatabaseCollectionMap, DatabaseDocumentMap
+from map import Map, DatabaseCollectionMap
 import pandas as pd
 import json
 import math
@@ -18,7 +18,7 @@ class Course(Feature):
     def execute_message(self, event, **kwargs):
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("course")
+            "course"
         ).get("select")
         return LineBotHelper.reply_message(event, [FlexMessage(alt_text='開課時間查詢', contents=FlexContainer.from_json(line_flex_str))])
 
@@ -28,24 +28,24 @@ class Course(Feature):
         if type == 'open':
             quick_reply_data = self.firebaseService.get_data(
                 DatabaseCollectionMap.QUICK_REPLY,
-                DatabaseDocumentMap.QUICK_REPLY.get("course")
+                "course"
             ).get("semester")
             return LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
                 
         elif type == 'progress':
             # 查詢修課進度
             user_id = event.source.user_id
-            user_details = self.spreadsheetService.get_worksheet_data('user_details')
-            user_detail = next((user for user in user_details if user.get('user_id') == user_id), None)
+
+            user_detail = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
             # 確認使用者填完的資料是否已經認證
-            if not user_detail['verification']:
+            if not user_detail or not user_detail['verification']:
                 return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，並傳送學生證正面照片完成認證')])
 
-            user_student_id = user_detail['student_id']
-            user_courses = [course for course in self.spreadsheetService.get_worksheet_data('user_courses_records') if course.get('student_id') == user_student_id]
+            student_id = user_detail['studentId']
+            user_courses = self.firebaseService.filter_data('course_study_records', [('student_id', '==', student_id)])
             # 取得課程資料
-            courses_df = pd.DataFrame(self.spreadsheetService.get_worksheet_data('courses'))
-            courses_records_df = pd.DataFrame(self.spreadsheetService.get_worksheet_data('course_records'))
+            courses_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE))
+            courses_records_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE_OPEN))
             user_courses_df = pd.DataFrame(user_courses)
             # 確認使用者是否修過此微學程的課程
             if not user_courses:
@@ -55,7 +55,8 @@ class Course(Feature):
                 df_merged['status'] = '未修畢'
                 df_merged['color'] = '#000000'
             else:
-                df_temp = pd.merge(user_courses_df, courses_records_df, left_on='record_id', right_on='id', how='inner')
+                df_temp = pd.merge(user_courses_df, courses_records_df, left_on='record_id', right_on='id', how='inner', suffixes=(None, '_to_drop'))
+                df_temp = df_temp.drop(columns=['id_to_drop'])
 
                 # 取得學生同課程最新的修課紀錄
                 df_temp['id'] = df_temp['id'].astype(int)
@@ -70,7 +71,7 @@ class Course(Feature):
             # 取得line flex template以及替換修課資料變數
             line_flex_template = self.firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("course")
+                "course"
             ).get('progress')
             for course_record in df_merged.to_dict(orient='records'):
                 course_id = course_record['course_id']
@@ -100,19 +101,24 @@ class Course(Feature):
             course_record_id = params.get('course_record')
             course_category = params.get('category')
 
-            #如果有course_record_id，則回傳該課程的詳細資訊
+            # 如果有course_record_id，則回傳該課程的詳細資訊
             if course_record_id:
-                course = self.__get_course_records(id=course_record_id)[0]
+                course = self.__get_course_records(id=int(course_record_id))[0]
                 line_flex_template = self.firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("course")
+                    "course"
                 ).get('detail')
                 line_flex_str = LineBotHelper.replace_variable(line_flex_template, course)
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='詳細說明', contents=FlexContainer.from_json(line_flex_str))])
             
-            #否則如果有course_category，則回傳該類別的課程資訊
+            # 否則如果有course_category，則回傳該類別的課程資訊
             elif course_category:
-                course_map = Map.COURSE
+                course_map = {
+                    'overview': '總覽',
+                    'basic': '基礎',
+                    'advanced': '進階',
+                    'practical': '實務'
+                }
                 # 拆解學年和學期
                 year = params.get('semester')[:3]
                 semester = params.get('semester')[3:]
@@ -125,7 +131,7 @@ class Course(Feature):
                 else:
                     line_flex_template = self.firebaseService.get_data(
                         DatabaseCollectionMap.LINE_FLEX, 
-                        DatabaseDocumentMap.LINE_FLEX.get("course")
+                        "course"
                     ).get('summary')
 
                     bubble_amount = 12
@@ -137,11 +143,11 @@ class Course(Feature):
                         flex_message_bubbles.append(FlexContainer.from_json(line_flex_str))
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=flex) for flex in flex_message_bubbles])
             
-            #否則回傳課程類別的快速回覆選項
+            # 否則回傳課程類別的快速回覆選項
             else:
                 quick_reply_data = self.firebaseService.get_data(
                     DatabaseCollectionMap.QUICK_REPLY,
-                    DatabaseDocumentMap.QUICK_REPLY.get("course")
+                    "course"
                 ).get("category")
                 for i, text in enumerate(quick_reply_data.get('actions')):
                     quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
@@ -151,21 +157,17 @@ class Course(Feature):
         """Returns
         list: 課程資料
         """
-        courses = self.spreadsheetService.get_worksheet_data('courses')
-        course_records = self.spreadsheetService.get_worksheet_data('course_records')
+        courses = self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE)
+        course_records = self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE_OPEN)
 
         courses_df = pd.DataFrame(courses)
         course_records_df = pd.DataFrame(course_records)
 
-        # 將開始與結束節次補零 (ex: 1 -> 01)
-        course_records_df['start_class'] = course_records_df['start_class'].apply(lambda x: str(x).zfill(2))
-        course_records_df['end_class'] = course_records_df['end_class'].apply(lambda x: str(x).zfill(2))
-
         # 將課程資料與課程紀錄資料合併
-        merged_data = pd.merge(courses_df, course_records_df, on='course_id', how='inner').astype(str)
+        merged_data = pd.merge(courses_df, course_records_df, on='course_id', how='inner')
         # 根據條件篩選資料
         if id:
-            merged_data = merged_data[merged_data['id'] == str(id)]
+            merged_data = merged_data[merged_data['id'] == id]
         elif year and semester:
             merged_data = merged_data[(merged_data['year'] == year) & (merged_data['semester'] == semester)]
         return merged_data.to_dict(orient='records')

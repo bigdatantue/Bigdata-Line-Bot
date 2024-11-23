@@ -64,7 +64,7 @@
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label for="studentId" class="form-label">學號<span style="color: red;">*</span></label>
-                    <input type="text" id="studentId" class="form-control" value="{{ user_info.student_id }}" maxlength="9" minlength="9" required {{ 'disabled' if user_info.verification else '' }}>
+                    <input type="text" id="studentId" class="form-control" value="{{ user_info.studentId }}" maxlength="9" minlength="9" required {{ 'disabled' if user_info.verification else '' }}>
                     <div class="invalid-feedback">
                         學號必填或學號格式錯誤
                     </div>
@@ -259,7 +259,7 @@
             $('#grade').val('{{ user_info.grade }}');
             $('#schoolName').val('{{ user_info.schoolName }}');
             $('#organization').val('{{ user_info.organization }}');
-            $('#studentId').val('{{ user_info.student_id }}');
+            $('#studentId').val('{{ user_info.studentId }}');
             $('#extDepartment').val('{{ user_info.extDepartment }}');
             $('#extGrade').val('{{ user_info.extGrade }}');
 

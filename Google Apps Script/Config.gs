@@ -1,6 +1,5 @@
 // 需在設定 => 指令碼屬性 設定以下參數
 const scriptProperties = PropertiesService.getScriptProperties();
-const CHANNEL_ACCESS_TOKEN = scriptProperties.getProperty('CHANNEL_ACCESS_TOKEN');
 const LINE_NOTIFY_TOKEN = scriptProperties.getProperty('LINE_NOTIFY_TOKEN');
 
 // 建立試算表menu

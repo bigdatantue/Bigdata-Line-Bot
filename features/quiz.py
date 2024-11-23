@@ -4,7 +4,7 @@ from linebot.v3.messaging import (
     FlexMessage,
     FlexContainer
 )
-from map import DatabaseCollectionMap, DatabaseDocumentMap, LIFFSize
+from map import DatabaseCollectionMap, LIFFSize
 from api.linebot_helper import LineBotHelper, FlexMessageHelper
 import pandas as pd
 import json
@@ -22,9 +22,9 @@ class Quiz(Feature):
     def execute_message(self, event, **kwargs):
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('start')
-        LineBotHelper.reply_message(event, [FlexMessage(alt_text='知識測驗', contents=FlexContainer.from_json(line_flex_str))])
+        return LineBotHelper.reply_message(event, [FlexMessage(alt_text='知識測驗', contents=FlexContainer.from_json(line_flex_str))])
 
     def execute_postback(self, event, **kwargs):
         params = kwargs.get('params')
@@ -60,7 +60,7 @@ class Quiz(Feature):
             answer_line_flex_str = self.__generate_answer_line_flex(last_quiz_question, is_correct)
 
             # 記錄該題作答(選擇的答案人數+1)
-            self.__create_answer_record(temp_data.get('mode'), user_id, temp_data.get('quiz_id'), last_quiz_question, answer, event.timestamp)
+            self.__create_answer_record(temp_data.get('mode'), user_id, temp_data.get('quiz_id'), last_quiz_question, answer)
             if is_correct:
                 temp_data['correct_amount'] += 1
 
@@ -92,7 +92,8 @@ class Quiz(Feature):
             question_id = params.get('id')
             category = params.get('category')
             competition_id = params.get('competition_id')
-            quiz_flex_datas = self.spreadsheetService.get_worksheet_data('quizzes')
+            quiz_flex_datas = self.firebaseService.get_collection_data(DatabaseCollectionMap.QUIZ)
+
             if mode == 'rank':
                 # 排行榜
                 rank_line_flex_str = self.__generate_rank_line_flex(competition_id, user_id)
@@ -111,27 +112,24 @@ class Quiz(Feature):
                 # 測驗說明
                 line_flex_str = self.firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                    "quiz"
                 ).get('competition_rule')
                 userinfo_url = f'https://liff.line.me/{LIFFSize.TALL.value}/userinfo?userId={user_id}'
                 line_flex_json = LineBotHelper.replace_variable(line_flex_str, {'category': category, 'competition_id': competition_id, 'userinfo_url': userinfo_url})
                 return LineBotHelper.reply_message(event, [FlexMessage(alt_text='測驗說明', contents=FlexContainer.from_json(line_flex_json))])
             if category:
                 quiz_id = LineBotHelper.generate_id()
-                current_time = LineBotHelper.get_current_time().strftime('%Y-%m-%d %H:%M:%S')
+                current_time = LineBotHelper.get_current_time()
                 if mode == 'competition':
                     # 確認使用者是否有在設定中填寫資料
-                    user_details = self.spreadsheetService.get_worksheet_data('user_details')
-                    user_detail = [user for user in user_details if user.get('user_id') == user_id]
-                    if len(user_detail) == 0:
+                    user_detail = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
+                    if not user_detail:
                         return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，完成填寫後才可以參與競賽')])
                     
-                    competition_logs = self.spreadsheetService.get_worksheet_data('competitions')
-                    competition_log = [log for log in competition_logs if log.get('competition_id') == competition_id and log.get('user_id') == user_id]
+                    competition_log = self.firebaseService.filter_data('competitions', [('competition_id', '==', competition_id), ('user_id', '==', user_id)])
                     if len(competition_log) > 0:
                         quiz_id = competition_log[0].get('quiz_id')
-                        quiz_records = self.spreadsheetService.get_worksheet_data('quiz_records')
-                        quiz_record = [record for record in quiz_records if record.get('quiz_id') == quiz_id]
+                        quiz_record = self.firebaseService.filter_data('quiz_records', [('quiz_id', '==', quiz_id)])
                         if competition_id and not self.__check_competition_open_time(competition_id):
                             return LineBotHelper.reply_message(event, [TextMessage(text='該競賽已結束!')])
                         elif competition_log[0].get('time_spent'):
@@ -142,17 +140,23 @@ class Quiz(Feature):
                         else:
                             return LineBotHelper.reply_message(event, [TextMessage(text='您的競賽已在進行中')])
                     if self.__check_competition_open_time(competition_id):
-                        wks = self.spreadsheetService.sh.worksheet_by_title('competitions')
-                        wks.append_table([competition_id, quiz_id, user_id, current_time])
+                        self.firebaseService.add_data(
+                            DatabaseCollectionMap.COMPETITION,
+                            quiz_id,
+                            {
+                                'competition_id': competition_id,
+                                'quiz_id': quiz_id, 'user_id': user_id,
+                                'start_time': current_time
+                            }
+                        )
                     else:
                         return LineBotHelper.reply_message(event, [TextMessage(text='目前尚未開放測驗')])
                 # 隨機抽取題目，並存入TEMP
                 quiz_flex_data = [quiz for quiz in quiz_flex_datas if quiz.get('enable') and quiz.get('mode') == mode and quiz.get('category') == category][0]
                 question_amount = quiz_flex_data.get('question_amount')
                 database_amount = quiz_flex_data.get('database_amount')
-                questions = self.spreadsheetService.get_worksheet_data('quiz_questions')
-                quiz_questions = random.sample([question for question in questions if question.get('category') == category and not question.get('is_competition')], database_amount)
-                quiz_questions.extend(random.sample([question for question in questions if question.get('category') == category and question.get('is_competition')], question_amount - database_amount))
+                quiz_questions = random.sample(self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('is_competition', '==', False)]) , database_amount)
+                quiz_questions.extend(random.sample(self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('is_competition', '==', True)]), question_amount - database_amount))
                 random.shuffle(quiz_questions)
                 data = {
                     'task': 'quiz',
@@ -173,7 +177,7 @@ class Quiz(Feature):
             else:
                 line_flex_data = self.firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                    "quiz"
                 )
                 line_flex_template = line_flex_data.get('general_select') if mode == 'general' else line_flex_data.get('competition_select')
 
@@ -182,9 +186,10 @@ class Quiz(Feature):
                     # 確認選擇的測驗類別是否有開放
                     return LineBotHelper.reply_message(event, [TextMessage(text='目前尚未開放此測驗模式')])
                 else:
+                    taiwan_tz = pytz.timezone('Asia/Taipei')
                     for quiz in quiz_flex_data:
-                        quiz['start_time'] = quiz.get('start_time') if quiz.get('start_time') else '無期限'
-                        quiz['end_time'] = quiz.get('end_time') if quiz.get('end_time') else '無期限'
+                        quiz['start_time'] = quiz.get('start_time').astimezone(taiwan_tz).strftime('%Y-%m-%d %H:%M') if quiz.get('start_time') else '無期限'
+                        quiz['end_time'] = quiz.get('end_time').astimezone(taiwan_tz).strftime('%Y-%m-%d %H:%M') if quiz.get('end_time') else '無期限'
                     line_flex_json = FlexMessageHelper.create_carousel_bubbles(quiz_flex_data, json.loads(line_flex_template))
                     return LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇測驗類別', contents=FlexContainer.from_json(json.dumps(line_flex_json)))])
     
@@ -200,7 +205,7 @@ class Quiz(Feature):
 
         line_flex_quiz = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         )
         line_flex_str = line_flex_quiz.get('question_with_image') if question.get('image_url') else line_flex_quiz.get('question')
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
@@ -216,7 +221,7 @@ class Quiz(Feature):
         """
         line_flex_quiz = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         )
         line_flex_str = line_flex_quiz.get('correct') if is_correct else line_flex_quiz.get('wrong')
 
@@ -231,7 +236,7 @@ class Quiz(Feature):
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, question)
         return line_flex_str
 
-    def __create_answer_record(self, mode: str, user_id: str, quiz_id: str, question: dict, answer: str, timestamp: int):
+    def __create_answer_record(self, mode: str, user_id: str, quiz_id: str, question: dict, answer: str):
         """
         記錄該題作答(選擇的答案人數+1)以及個別題目記錄到quiz_records(個人的答題紀錄)
         """
@@ -243,35 +248,59 @@ class Quiz(Feature):
             'd': 'D_vote_count'
         }
         column_name = column_map.get(answer)
-        wks = self.spreadsheetService.sh.worksheet_by_title('quiz_questions')
-        col_index = self.spreadsheetService.get_column_index(wks, column_name)
-        row_index = int(question.get('id')) + 1
-        self.spreadsheetService.update_cell_value('quiz_questions', (row_index, col_index), int(question.get(column_name)) + 1)
+        self.firebaseService.update_data(
+            'quiz_questions',
+            str(question.get('id')),
+            {
+                column_name: question.get(column_name) + 1,
+                'total_count': question.get('total_count') + 1,
+                'correct_count': question.get('correct_count') + 1 if answer == question.get('answer').lower() else question.get('correct_count'),
+                'wrong_count': question.get('wrong_count') + 1 if answer != question.get('answer').lower() else question.get('wrong_count')
+            }
+        )
 
         # 紀錄該題作答(quiz_records)
         question_id = question.get('id')
         taiwan_tz = pytz.timezone('Asia/Taipei')
-        event_time = datetime.fromtimestamp(timestamp/1000, taiwan_tz).strftime('%Y-%m-%d %H:%M:%S')
-        wks = self.spreadsheetService.sh.worksheet_by_title('quiz_records')
-        wks.append_table(values=[mode, quiz_id, user_id, question_id, answer, event_time])
+        event_time = LineBotHelper.get_current_time().astimezone(taiwan_tz)
+        self.firebaseService.add_data(
+            DatabaseCollectionMap.QUIZ_RECORD,
+            LineBotHelper.generate_id(),
+            {
+                'mode': mode,
+                'quiz_id': quiz_id,
+                'user_id': user_id,
+                'question_id': question_id,
+                'answer': answer,
+                'timestamp': event_time
+            }
+        )
 
-    # 生成測驗結果
     def __generate_general_quiz_result(self, user_id: str, params: dict):
         """
         生成測驗結果，並記錄整個quiz結果到quiz_log(個人的測驗紀錄)
         """
         correct_amount = params.get('correct_amount')
         # 個別測驗紀錄正確率在quiz_log中
-        wks = self.spreadsheetService.sh.worksheet_by_title('quiz_logs')
-        wks.append_table(values=[params.get('quiz_id'), user_id, correct_amount, params.get('question_amount')])
-        quiz_logs = self.spreadsheetService.get_worksheet_data('quiz_logs')
+        quiz_id = params.get('quiz_id')
+        self.firebaseService.add_data(
+            DatabaseCollectionMap.QUIZ_LOG,
+            quiz_id,
+            {
+                'quiz_id': quiz_id,
+                'user_id': user_id,
+                'correct_amount': correct_amount,
+                'question_amount': params.get('question_amount')
+            }
+        )
+        quiz_logs = self.firebaseService.get_collection_data(DatabaseCollectionMap.QUIZ_LOG)
         defeat_rate = round(len([log for log in quiz_logs if log['correct_amount'] < correct_amount])/len(quiz_logs)*100, 2) if correct_amount > 0 else 0
         params.update({'defeat_rate': defeat_rate})
         
         # 產生測驗結果line flex
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('general_result')
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
         return line_flex_str
@@ -281,36 +310,34 @@ class Quiz(Feature):
         生成測驗結果，並記錄整個quiz結果到compitition(個人的競賽測驗紀錄)
         """
         correct_amount = params.get('correct_amount')
-        quiz_records = self.spreadsheetService.get_worksheet_data('quiz_records')
+        quiz_records = self.firebaseService.filter_data('quiz_records', [('quiz_id', '==', params.get('quiz_id'))], 'timestamp')
         
         # 測驗開始與結束時間計算
-        current_time = params.get('start_time')
-        current_time = datetime.strptime(current_time, '%Y-%m-%d %H:%M:%S')
-        end_time = [record for record in quiz_records if record.get('quiz_id') == params.get('quiz_id')][-1].get('timestamp')
-        end_time = datetime.strptime(end_time, '%Y-%m-%d %H:%M:%S')
-        end_time_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
-        spend_time = end_time - current_time
+        start_time = params.get('start_time')
+        end_time = quiz_records[-1].get('timestamp')
+        spend_time = end_time - start_time
         spend_time_str = LineBotHelper.convert_timedelta_to_string(spend_time)
         
         # 紀錄測驗結果資料
-        wks = self.spreadsheetService.sh.worksheet_by_title('competitions')
-        row_index = self.spreadsheetService.get_row_index(wks, 'quiz_id', params.get('quiz_id'))
-        # 取得開始與結束的欄位索引並轉換成字母
-        start_column_index = self.spreadsheetService.get_column_index(wks, 'end_time')
-        start_column_index = chr(start_column_index + ord('A') - 1)
-        end_column_index = self.spreadsheetService.get_column_index(wks, 'question_amount')
-        end_column_index = chr(end_column_index + ord('A') - 1)
-        
-        self.spreadsheetService.update_cells_values('competitions', f"{start_column_index}{row_index}:{end_column_index}{row_index}", [[end_time_str, spend_time_str, correct_amount, params.get('question_amount')]])
+        self.firebaseService.update_data(
+            'competitions',
+            params.get('quiz_id'),
+            {
+                'end_time': end_time,
+                'time_spent': spend_time_str,
+                'correct_amount': correct_amount,
+                'question_amount': params.get('question_amount')
+            }
+        )
         
         # 產生結果line flex
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('competition_result')
         hours, minutes, seconds = spend_time_str.split(':')
-        user_infos = self.spreadsheetService.get_worksheet_data('user_info')
-        user_picture_url = [user for user in user_infos if user.get('user_id') == user_id][0].get('picture_url')
+        user_info = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0]
+        user_picture_url = user_info.get('pictureUrl')
         params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds, 'user_picture_url': user_picture_url})
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
         return line_flex_str
@@ -319,15 +346,10 @@ class Quiz(Feature):
         """Returns
         bool: 是否在競賽時間內
         """
-        quiz_flex_datas = self.spreadsheetService.get_worksheet_data('quizzes')
-        quiz_flex_data = [quiz for quiz in quiz_flex_datas if quiz.get('enable') and quiz.get('competition_id') == competition_id][0]
+        quiz_flex_data = self.firebaseService.filter_data('quizzes', [('enable', '==', True), ('competition_id', '==', competition_id)])[0]
         start_time = quiz_flex_data["start_time"]
         end_time = quiz_flex_data["end_time"]
         current_time = LineBotHelper.get_current_time()
-        # 檢查測驗時間是否在設定的區間內
-        taiwan_tz = pytz.timezone('Asia/Taipei')
-        start_time = taiwan_tz.localize(datetime.strptime(start_time, '%Y-%m-%d %H:%M'))
-        end_time = taiwan_tz.localize(datetime.strptime(end_time, '%Y-%m-%d %H:%M'))
         return current_time >= start_time and current_time <= end_time
     
     def __generate_rank_line_flex(self, competition_id: str, user_id: str):
@@ -338,7 +360,7 @@ class Quiz(Feature):
             """Returns
             str: 格式化後的時間(只留mm:ss, 超過59:59則回傳>59:59)
             """
-            if time_spent.split(':')[0] == '0':
+            if time_spent.split(':')[0] == '00':
                 return ':'.join(time_spent.split(':')[1:])
             return '>59:59'
         
@@ -346,11 +368,11 @@ class Quiz(Feature):
             """Returns
             dict: 使用者資料
             """
-            info = [info for info in user_info if info.get('user_id') == user_id][0]
+            info = [info for info in user_info if info.get('userId') == user_id][0]
             return {
                 'mode': 'competition',
-                'user_display_name': info.get('display_name'),
-                'user_picture_url': info.get('picture_url'),
+                'user_display_name': info.get('displayName'),
+                'user_picture_url': info.get('pictureUrl'),
                 'user_rank': '-',
                 'user_correct_rate': '-',
                 'user_time_spent': '-',
@@ -370,16 +392,15 @@ class Quiz(Feature):
                 display_name = display_name[0] + '**' + display_name[-1]
             return display_name
 
-        user_info = self.spreadsheetService.get_worksheet_data('user_info')
-        competions = self.spreadsheetService.get_worksheet_data('competitions')
-        competition = [competition for competition in competions if competition.get('competition_id') == competition_id and competition.get('time_spent')]
+        user_info = self.firebaseService.get_collection_data(DatabaseCollectionMap.USER)
+        competition = self.firebaseService.filter_data('competitions', [('competition_id', '==', competition_id), ('time_spent', '!=', '')])
         merged_data = []
         data = {}
         if len(competition) == 0:
             # 還未有人參賽
             data = get_user_data(user_info, user_id)
         else:
-            merged_data_df = pd.merge(pd.DataFrame(user_info), pd.DataFrame(competition), on='user_id')
+            merged_data_df = pd.merge(pd.DataFrame(user_info), pd.DataFrame(competition), left_on='userId', right_on='user_id')
 
             # 依照正確率、答題時間排序進行排名
             merged_data_df['rank'] = merged_data_df[['correct_amount', 'time_spent']].apply(
@@ -398,8 +419,8 @@ class Quiz(Feature):
                 user_time_spent = format_time_spent_str(user_competition.get('time_spent'))
                 data = {
                     'mode': 'competition',
-                    'user_display_name': user_competition.get('display_name'),
-                    'user_picture_url': user_competition.get('picture_url'),
+                    'user_display_name': user_competition.get('displayName'),
+                    'user_picture_url': user_competition.get('pictureUrl'),
                     'user_rank': user_competition.get('rank'),
                     'user_correct_rate': round(int(user_competition.get('correct_amount')) / int(user_competition.get('question_amount')) * 100),
                     'user_time_spent': user_time_spent,
@@ -407,7 +428,7 @@ class Quiz(Feature):
 
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('rank')
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, data)
 
@@ -416,14 +437,14 @@ class Quiz(Feature):
             # 若前五名有資料則顯示，否則顯示'-'
             if len(merged_data) >= i + 1:
                 merged_data[i]['correct_rate'] = round(int(merged_data[i].get('correct_amount')) / int(merged_data[i].get('question_amount')) * 100)
-                merged_data[i]['display_name'] = generate_mask(merged_data[i].get('display_name'))
+                merged_data[i]['displayName'] = generate_mask(merged_data[i].get('displayName'))
                 merged_data[i]['time_spent'] = format_time_spent_str(merged_data[i].get('time_spent'))
                 line_flex_str = LineBotHelper.replace_variable(line_flex_str, merged_data[i], 1)
             else:
                 data = {
                     'rank': '-',
-                    'display_name': '-',
-                    'picture_url': 'https://example.com/default.png',
+                    'displayName': '-',
+                    'pictureUrl': 'https://example.com/default.png', # 為了讓圖片不會顯示隨便寫的網址
                     'correct_rate': '-',
                     'time_spent': '-'
                 }
@@ -437,7 +458,7 @@ class Quiz(Feature):
         """
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('history_select')
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, {"category" : category})
         return LineBotHelper.reply_message(event, [FlexMessage(alt_text='選擇查看範圍', contents=FlexContainer.from_json(line_flex_str))])
@@ -446,19 +467,19 @@ class Quiz(Feature):
         """Return
         生成「全服錯題」的Carousel，包含全服答錯率最高的十題
         """
-        quiz_questions = self.spreadsheetService.get_worksheet_data('quiz_questions')
         # 過濾掉回答數為0、且為同個類別主題的題目
-        filtered_questions = [q for q in quiz_questions if q['category'] == category and float(q['total_count']) != 0]
-        if not filtered_questions:
+        quiz_questions = self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('total_count', '>', 0)])
+
+        if not quiz_questions:
             return LineBotHelper.reply_message(event, [TextMessage(text='全服尚未有任何答題紀錄！')])
         else:
             # 根據正確率排序並選取前10個題目（正確率最低的前十題）
-            sorted_questions = sorted(filtered_questions, key=lambda x: float(x['correct_rate']))[:10]
+            sorted_questions = sorted(quiz_questions, key=lambda x: float(x['correct_rate']))[:10]
 
             # 生成carousel bubble
             line_flex_str = self.firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
-                DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                "quiz"
             ).get('history_question_list')
 
             for question in sorted_questions:
@@ -473,17 +494,14 @@ class Quiz(Feature):
 
             line_flex_str = FlexMessageHelper.create_carousel_bubbles(sorted_questions, json.loads(line_flex_str))
             line_flex_str = json.dumps(line_flex_str)
-            return LineBotHelper.reply_message(event, [FlexMessage(alt_text='全服答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+            return LineBotHelper.reply_message(event, [FlexMessage(alt_text='全服錯題', contents=FlexContainer.from_json(line_flex_str))])
 
     def __generate_personal_history_question(self, event, category, user_id):
         """Return
         生成「我的錯題」的Carousel，包含個人答錯率最高的十題
         """
-        quiz_records_df = pd.DataFrame(self.spreadsheetService.get_worksheet_data('quiz_records'))
-        quiz_questions_df = pd.DataFrame(self.spreadsheetService.get_worksheet_data('quiz_questions'))
-
-        # 篩選該類別題目
-        quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
+        quiz_records_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.QUIZ_RECORD))
+        quiz_questions_df = pd.DataFrame(self.firebaseService.filter_data('quiz_questions', [('category', '==', category)]))
         
         # 判斷該類別是否有任何答題記錄（依據total_count欄位）
         if quiz_questions_df['total_count'].sum() == 0:
@@ -535,27 +553,25 @@ class Quiz(Feature):
                 # 抓模板
                 line_flex_str = self.firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
-                    DatabaseDocumentMap.LINE_FLEX.get("quiz")
+                    "quiz"
                 ).get('history_question_list')
 
                 # 生成carousel bubble
                 line_flex_str = FlexMessageHelper.create_carousel_bubbles(ten_questions_df.to_dict('records'), json.loads(line_flex_str))
                 line_flex_str = json.dumps(line_flex_str)
-                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='個人答錯率最高的前10個題目', contents=FlexContainer.from_json(line_flex_str))])
+                return LineBotHelper.reply_message(event, [FlexMessage(alt_text='我的錯題', contents=FlexContainer.from_json(line_flex_str))])
 
     def __generate_complete_history_question(self, event, question_id):
         """Return
         生成完整測驗題目的Flex Message（包含答案）
         """
-        quiz_questions = self.spreadsheetService.get_worksheet_data('quiz_questions')
-
         # 只提取id == question_id的題目資料
-        quiz_question = [question for question in quiz_questions if question.get('id') == int(question_id)][0]
+        quiz_question = self.firebaseService.filter_data('quiz_questions', [('id', '==', int(question_id) )])[0]
 
         # 生成題目的Line Flex
         line_flex_str = self.firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
-            DatabaseDocumentMap.LINE_FLEX.get("quiz")
+            "quiz"
         ).get('history_question_with_image' if quiz_question.get('image_url') else 'history_question')
         quiz_question['width'] = 100 - quiz_question['correct_rate']
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, quiz_question)
