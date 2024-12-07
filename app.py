@@ -1,6 +1,6 @@
 from config import Config
-from strategy import TaskStrategy, TemplateStrategy
-from map import Map, FeatureStatus, Permission
+from features.base import feature_factory
+from map import Map, FeatureStatus, Permission, DatabaseCollectionMap
 from api.linebot_helper import LineBotHelper
 from flask import Flask, request, abort
 from line_notify_app import line_notify_app
@@ -30,7 +30,6 @@ app.register_blueprint(liff_app, url_prefix='/liff')
 config = Config()
 configuration = config.configuration
 line_handler = config.handler
-spreadsheetService = config.spreadsheetService
 firebaseService = config.firebaseService
 lineNotifyService = config.lineNotifyService
 
@@ -61,21 +60,17 @@ def handle_follow(event):
     """
     try:
         LineBotHelper.show_loading_animation_(event)
-        # 取得使用者ID
         user_id = event.source.user_id
-        # 檢查使用者是否存在，若不存在則新增至試算表
-        if not spreadsheetService.check_user_exists('user_info', user_id):
+        # 檢查使用者是否存在，若不存在則新增至資料庫
+        if not firebaseService.get_data(DatabaseCollectionMap.USER, user_id):
             user_info = LineBotHelper.get_user_info(user_id)
-            user_info.insert(0, user_id)
-            # 新增一般使用者權限
-            user_info.append(Permission.USER)
-            spreadsheetService.add_user('user_info', user_info)
-            
-        #使用者在試算表的好友狀態設為True
-        spreadsheetService.set_user_status(user_id, True)
+            # 設定使用者的權限為USER，並設定為啟用狀態
+            user_info.update({'permission': Permission.USER, 'isActive': True})
+            firebaseService.add_data(DatabaseCollectionMap.USER, user_id, user_info)
 
-        welcome_message = '歡迎加入❤️\n我是教育大數據機器人，\n可以解決您關於微型學程的各式問題。'
-        image_url = 'https://i.imgur.com/RFQKmop.png'
+        follow_doc = firebaseService.get_data(DatabaseCollectionMap.CONFIG, 'follow')
+        welcome_message = follow_doc.get('welcome_message').replace('\\n', '\n')
+        image_url = follow_doc.get('welcome_image')
 
         messages = [
             ImageMessage(original_content_url=image_url, preview_image_url=image_url),
@@ -95,9 +90,8 @@ def handle_unfollow(event):
     """
     try:
         user_id = event.source.user_id
-        
-        #使用者在試算表的好友狀態設為False
-        spreadsheetService.set_user_status(user_id, False)
+        # 使用者在資料庫中的isActive設定為False
+        firebaseService.update_data('users', user_id, {'isActive': False})
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
@@ -111,43 +105,38 @@ def handle_message(event):
     try:
         if LineBotHelper.check_is_fixing():
             return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
-        # 取得使用者文字訊息
+        
         user_msg = event.message.text
         user_id = event.source.user_id
         feature = Map.FEATURE.get(user_msg)
         # 如果使用者輸入的文字為FAQ的文字，則設定功能為FAQ
         if user_msg in Map.FAQ_SET:
             feature = 'faq'
-        temp = firebaseService.get_data('temp', user_id)
+        
+        temp = firebaseService.get_data(DatabaseCollectionMap.TEMP, user_id)
 
         # 判斷使用者輸入的文字是否為功能
         if feature:
             LineBotHelper.show_loading_animation_(event)
             # 如果使用者跳出上個功能，則刪除暫存資料
             if temp:
-                firebaseService.delete_data('temp', user_id)
+                firebaseService.delete_data(DatabaseCollectionMap.TEMP, user_id)
+            
             feature_status = config.feature.get(feature)
-            if feature_status == FeatureStatus.DISABLE:
-                return LineBotHelper.reply_message(event, [TextMessage(text='此功能尚未開放，敬請期待！')])
-            elif feature_status == FeatureStatus.MAINTENANCE:
-                return LineBotHelper.reply_message(event, [TextMessage(text='此功能維護中，請見諒！')])
-            else:
-                # 動態選擇Template Strategy(第一次輸入功能文字)
-                strategy = TemplateStrategy('message', feature)
-                strategy_class = strategy.strategy_action()
-                if strategy_class:
-                    task = strategy_class()
-                    task.execute(event, request=request)
-                    return
+            match feature_status:
+                case FeatureStatus.DISABLE:
+                    return LineBotHelper.reply_message(event, [TextMessage(text='此功能尚未開放，敬請期待！')])
+                case FeatureStatus.MAINTENANCE:
+                    return LineBotHelper.reply_message(event, [TextMessage(text='此功能維護中，請見諒！')])
+                
+            feature_instance = feature_factory.get_feature(feature)
+            if feature_instance:
+                feature_instance.execute_message(event, request=request)
         elif temp:
             LineBotHelper.show_loading_animation_(event)
-            # 動態選擇Task Strategy(功能中需要使用者輸入文字)
-            strategy = TaskStrategy('message', temp.get('task'))
-            strategy_class = strategy.strategy_action()
-            if strategy_class:
-                task = strategy_class()
-                task.execute(event, {'user_msg': user_msg})
-                return
+            feature_instance = feature_factory.get_feature(temp.get('task'))
+            if feature_instance:
+                feature_instance.execute_message(event, user_msg=user_msg)
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
@@ -179,33 +168,28 @@ def handle_postback(event):
     """
     try:
         postback_data = event.postback.data
+
+        # 切換圖文選單也會觸發postback事件，因此需過濾掉
         if 'richmenu' in postback_data:
             return
         LineBotHelper.show_loading_animation_(event)
         if LineBotHelper.check_is_fixing():
             return LineBotHelper.reply_message(event, [TextMessage(text='系統維護中，請稍後再試！')])
         
-        # 如果有datetimpicker的參數，才會有postback_params
-        postback_params = event.postback.params
-        params = postback_params if postback_params else {}
+        params = event.postback.params or {}
         if '=' in postback_data:
-            # 重新拆解Postback Data的參數
-            for param in postback_data.split('&'):
-                key, value = param.split('=')
-                params[key] = value
+            params.update(dict(param.split('=') for param in postback_data.split('&')))
         
-        # 動態選擇Task Strategy
-        strategy = TaskStrategy('postback', params)
-        strategy_class = strategy.strategy_action()
-        if strategy_class:
-            task = strategy_class()
-            task.execute(event, params)
-            return
+        feature_instance = feature_factory.get_feature(params.get('task'))
+        if feature_instance:
+            feature_instance.execute_postback(event, params=params)
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))
         lineNotifyService.send_notify_message(config.LINE_NOTIFY_GROUP_TOKEN, f'發生錯誤！\n{error_message}')
         LineBotHelper.reply_message(event, [TextMessage(text='發生錯誤，請聯繫系統管理員！')])
+
+doc_watch = firebaseService.on_snapshot("quiz_questions")
 
 if __name__ == "__main__":
     app.run()
