@@ -6,7 +6,6 @@ line_notify_app = Blueprint('line_notify_app', __name__)
 
 config = Config()
 lineNotifyService = config.lineNotifyService
-spreadsheetService = config.spreadsheetService
 
 @line_notify_app.route('/register', methods=['GET'])
 def line_notify_register():
@@ -36,7 +35,6 @@ def line_notify():
     user_info = lineNotifyService.check_notify_status(token)
     user_info = [user_id, token, user_info['targetType'],  user_info['target'], current_time]
 
-    spreadsheetService.add_user('notify_info', user_info)
     msg = "感謝您連動「國北教大教育大數據微學程」Line Notify 推播服務，若未來您想解除連動，請點選 https://notify-bot.line.me/my/ 後將連動解除即可。"
     lineNotifyService.send_notify_message(token, msg)
     return render_template('notify/callback.html')

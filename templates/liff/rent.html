@@ -71,8 +71,8 @@
         </div>
 
         <div class="col-md-6 mb-3">
-          <label for="pickupTime" class="form-label">取件時間 <span class="text-danger">*</span></label>
-          <input type="time" class="form-control" id="pickupTime" required/>
+          <label for="selectedTime" class="form-label">取件時間 <span class="text-danger">*</span></label>
+          <input type="time" class="form-control" id="selectedTime" required/>
           <div class="invalid-feedback">請選擇取件時間</div>
         </div>
       </div>
@@ -112,8 +112,6 @@
       const today = new Date().toISOString().split('T')[0];
       // 設定借用日期最小值為今天
       $('#startDate').attr('min', today);
-      // 禁用歸還日期，直到選擇借用日期
-      $('#endDate').attr('disabled', true);
     
       // 檢查借用日期是否晚於今天
       $('#startDate').change(function() {
@@ -123,7 +121,6 @@
           alert('借用日期不可早於今天');
           $(this).val('');
         } else {
-          $('#endDate').attr('disabled', false);
           $('#endDate').attr('min', borrowDate); 
         }
       });
@@ -201,7 +198,7 @@
           equipmentAmount: $('#equipmentAmount').val(),
           startDate: $('#startDate').val(),
           endDate: $('#endDate').val(),
-          pickupTime: $('#pickupTime').val(),
+          selectedTime: $('#selectedTime').val(),
           returnTime: $('#returnTime').val()
         };
 
