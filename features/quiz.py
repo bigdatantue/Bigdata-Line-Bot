@@ -122,14 +122,14 @@ class Quiz(Feature):
                 current_time = LineBotHelper.get_current_time()
                 if mode == 'competition':
                     # 確認使用者是否有在設定中填寫資料
-                    user_detail = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
+                    user_detail = self.firebaseService.get_data(DatabaseCollectionMap.USER, user_id).get('details')
                     if not user_detail:
                         return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，完成填寫後才可以參與競賽')])
                     
-                    competition_log = self.firebaseService.filter_data('competitions', [('competition_id', '==', competition_id), ('user_id', '==', user_id)])
+                    competition_log = self.firebaseService.filter_data(DatabaseCollectionMap.COMPETITION, [('competition_id', '==', competition_id), ('user_id', '==', user_id)])
                     if len(competition_log) > 0:
                         quiz_id = competition_log[0].get('quiz_id')
-                        quiz_record = self.firebaseService.filter_data('quiz_records', [('quiz_id', '==', quiz_id)])
+                        quiz_record = self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_RECORD, [('quiz_id', '==', quiz_id)])
                         if competition_id and not self.__check_competition_open_time(competition_id):
                             return LineBotHelper.reply_message(event, [TextMessage(text='該競賽已結束!')])
                         elif competition_log[0].get('time_spent'):
@@ -155,8 +155,8 @@ class Quiz(Feature):
                 quiz_flex_data = [quiz for quiz in quiz_flex_datas if quiz.get('enable') and quiz.get('mode') == mode and quiz.get('category') == category][0]
                 question_amount = quiz_flex_data.get('question_amount')
                 database_amount = quiz_flex_data.get('database_amount')
-                quiz_questions = random.sample(self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('is_competition', '==', False)]) , database_amount)
-                quiz_questions.extend(random.sample(self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('is_competition', '==', True)]), question_amount - database_amount))
+                quiz_questions = random.sample(self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_QUESTION, [('category', '==', category), ('is_competition', '==', False)]) , database_amount)
+                quiz_questions.extend(random.sample(self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_QUESTION, [('category', '==', category), ('is_competition', '==', True)]), question_amount - database_amount))
                 random.shuffle(quiz_questions)
                 data = {
                     'task': 'quiz',
@@ -249,7 +249,7 @@ class Quiz(Feature):
         }
         column_name = column_map.get(answer)
         self.firebaseService.update_data(
-            'quiz_questions',
+            DatabaseCollectionMap.QUIZ_QUESTION,
             str(question.get('id')),
             {
                 column_name: question.get(column_name) + 1,
@@ -293,8 +293,9 @@ class Quiz(Feature):
                 'question_amount': params.get('question_amount')
             }
         )
-        quiz_logs = self.firebaseService.get_collection_data(DatabaseCollectionMap.QUIZ_LOG)
-        defeat_rate = round(len([log for log in quiz_logs if log['correct_amount'] < correct_amount])/len(quiz_logs)*100, 2) if correct_amount > 0 else 0
+        defeat_count = self.firebaseService.get_aggregate_count(DatabaseCollectionMap.QUIZ_LOG, [('correct_amount', '<', correct_amount)])
+        total_count = self.firebaseService.get_aggregate_count(DatabaseCollectionMap.QUIZ_LOG, [('correct_amount', '>=', 0)])
+        defeat_rate = round((defeat_count / total_count)*100, 2) if correct_amount > 0 else 0
         params.update({'defeat_rate': defeat_rate})
         
         # 產生測驗結果line flex
@@ -310,7 +311,7 @@ class Quiz(Feature):
         生成測驗結果，並記錄整個quiz結果到compitition(個人的競賽測驗紀錄)
         """
         correct_amount = params.get('correct_amount')
-        quiz_records = self.firebaseService.filter_data('quiz_records', [('quiz_id', '==', params.get('quiz_id'))], 'timestamp')
+        quiz_records = self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_RECORD, [('quiz_id', '==', params.get('quiz_id'))], ('timestamp', 'asc'))
         
         # 測驗開始與結束時間計算
         start_time = params.get('start_time')
@@ -320,7 +321,7 @@ class Quiz(Feature):
         
         # 紀錄測驗結果資料
         self.firebaseService.update_data(
-            'competitions',
+            DatabaseCollectionMap.COMPETITION,
             params.get('quiz_id'),
             {
                 'end_time': end_time,
@@ -336,7 +337,7 @@ class Quiz(Feature):
             "quiz"
         ).get('competition_result')
         hours, minutes, seconds = spend_time_str.split(':')
-        user_info = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0]
+        user_info = self.firebaseService.get_data(DatabaseCollectionMap.USER, user_id)
         user_picture_url = user_info.get('pictureUrl')
         params.update({'hours': hours, 'minutes': minutes, 'seconds': seconds, 'user_picture_url': user_picture_url})
         line_flex_str = LineBotHelper.replace_variable(line_flex_str, params)
@@ -346,7 +347,7 @@ class Quiz(Feature):
         """Returns
         bool: 是否在競賽時間內
         """
-        quiz_flex_data = self.firebaseService.filter_data('quizzes', [('enable', '==', True), ('competition_id', '==', competition_id)])[0]
+        quiz_flex_data = self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ, [('enable', '==', True), ('competition_id', '==', competition_id)])[0]
         start_time = quiz_flex_data["start_time"]
         end_time = quiz_flex_data["end_time"]
         current_time = LineBotHelper.get_current_time()
@@ -368,11 +369,10 @@ class Quiz(Feature):
             """Returns
             dict: 使用者資料
             """
-            info = [info for info in user_info if info.get('userId') == user_id][0]
             return {
                 'mode': 'competition',
-                'user_display_name': info.get('displayName'),
-                'user_picture_url': info.get('pictureUrl'),
+                'user_display_name': user_info.get('displayName'),
+                'user_picture_url': user_info.get('pictureUrl'),
                 'user_rank': '-',
                 'user_correct_rate': '-',
                 'user_time_spent': '-',
@@ -392,23 +392,22 @@ class Quiz(Feature):
                 display_name = display_name[0] + '**' + display_name[-1]
             return display_name
 
-        user_info = self.firebaseService.get_collection_data(DatabaseCollectionMap.USER)
-        competition = self.firebaseService.filter_data('competitions', [('competition_id', '==', competition_id), ('time_spent', '!=', '')])
-        merged_data = []
+        user_info = self.firebaseService.get_data(DatabaseCollectionMap.USER, user_id)
+        competitions = self.firebaseService.filter_data(DatabaseCollectionMap.COMPETITION, [('competition_id', '==', competition_id), ('time_spent', '!=', '')])
         data = {}
-        if len(competition) == 0:
+        if len(competitions) == 0:
             # 還未有人參賽
             data = get_user_data(user_info, user_id)
         else:
-            merged_data_df = pd.merge(pd.DataFrame(user_info), pd.DataFrame(competition), left_on='userId', right_on='user_id')
+            competition_df = pd.DataFrame(competitions)
 
             # 依照正確率、答題時間排序進行排名
-            merged_data_df['rank'] = merged_data_df[['correct_amount', 'time_spent']].apply(
+            competition_df['rank'] = competition_df[['correct_amount', 'time_spent']].apply(
                 lambda x: (-x['correct_amount'], x['time_spent']), axis=1
             ).rank(method='min').astype(int)
-            merged_data_df = merged_data_df.sort_values(by='rank', ascending=True, ignore_index=True)
-            merged_data = merged_data_df.to_dict(orient='records')
-            user_competition = [data for data in merged_data if data.get('user_id') == user_id]
+            competition_df = competition_df.sort_values(by='rank', ascending=True, ignore_index=True)
+            competitions = competition_df.to_dict(orient='records')[:5]
+            user_competition = [competition for competition in competitions if competition.get('user_id') == user_id]
             
             if len(user_competition) == 0:
                 # 使用者未參賽
@@ -416,11 +415,12 @@ class Quiz(Feature):
             else:
                 # 使用者已參賽
                 user_competition = user_competition[0]
+                user_info = self.firebaseService.get_data(DatabaseCollectionMap.USER, user_id)
                 user_time_spent = format_time_spent_str(user_competition.get('time_spent'))
                 data = {
                     'mode': 'competition',
-                    'user_display_name': user_competition.get('displayName'),
-                    'user_picture_url': user_competition.get('pictureUrl'),
+                    'user_display_name': user_info.get('displayName'),
+                    'user_picture_url': user_info.get('pictureUrl'),
                     'user_rank': user_competition.get('rank'),
                     'user_correct_rate': round(int(user_competition.get('correct_amount')) / int(user_competition.get('question_amount')) * 100),
                     'user_time_spent': user_time_spent,
@@ -435,11 +435,13 @@ class Quiz(Feature):
         # 生成排行榜前5名
         for i in range(5):
             # 若前五名有資料則顯示，否則顯示'-'
-            if len(merged_data) >= i + 1:
-                merged_data[i]['correct_rate'] = round(int(merged_data[i].get('correct_amount')) / int(merged_data[i].get('question_amount')) * 100)
-                merged_data[i]['displayName'] = generate_mask(merged_data[i].get('displayName'))
-                merged_data[i]['time_spent'] = format_time_spent_str(merged_data[i].get('time_spent'))
-                line_flex_str = LineBotHelper.replace_variable(line_flex_str, merged_data[i], 1)
+            if len(competitions) >= i + 1:
+                user_info = self.firebaseService.get_data(DatabaseCollectionMap.USER, competitions[i].get('user_id'))
+                competitions[i]['correct_rate'] = round(int(competitions[i].get('correct_amount')) / int(competitions[i].get('question_amount')) * 100)
+                competitions[i]['displayName'] = generate_mask(user_info.get('displayName'))
+                competitions[i]['pictureUrl'] = user_info.get('pictureUrl')
+                competitions[i]['time_spent'] = format_time_spent_str(competitions[i].get('time_spent'))
+                line_flex_str = LineBotHelper.replace_variable(line_flex_str, competitions[i], 1)
             else:
                 data = {
                     'rank': '-',
@@ -468,21 +470,18 @@ class Quiz(Feature):
         生成「全服錯題」的Carousel，包含全服答錯率最高的十題
         """
         # 過濾掉回答數為0、且為同個類別主題的題目
-        quiz_questions = self.firebaseService.filter_data('quiz_questions', [('category', '==', category), ('total_count', '>', 0)])
+        quiz_questions = self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_QUESTION, [('category', '==', category), ('total_count', '>', 0)], ('correct_rate', 'asc'), 10)
 
         if not quiz_questions:
             return LineBotHelper.reply_message(event, [TextMessage(text='全服尚未有任何答題紀錄！')])
         else:
-            # 根據正確率排序並選取前10個題目（正確率最低的前十題）
-            sorted_questions = sorted(quiz_questions, key=lambda x: float(x['correct_rate']))[:10]
-
             # 生成carousel bubble
             line_flex_str = self.firebaseService.get_data(
                 DatabaseCollectionMap.LINE_FLEX,
                 "quiz"
             ).get('history_question_list')
 
-            for question in sorted_questions:
+            for question in quiz_questions:
                 question['width'] = 100 - question['correct_rate']
                 difficulty = int(question['difficulty'])
 
@@ -492,7 +491,7 @@ class Quiz(Feature):
                 for i in range(5 - difficulty):
                     question[f'star_url_{difficulty + i + 1}'] = self.gray_star_url  # 替換灰色星星
 
-            line_flex_str = FlexMessageHelper.create_carousel_bubbles(sorted_questions, json.loads(line_flex_str))
+            line_flex_str = FlexMessageHelper.create_carousel_bubbles(quiz_questions, json.loads(line_flex_str))
             line_flex_str = json.dumps(line_flex_str)
             return LineBotHelper.reply_message(event, [FlexMessage(alt_text='全服錯題', contents=FlexContainer.from_json(line_flex_str))])
 
@@ -500,33 +499,28 @@ class Quiz(Feature):
         """Return
         生成「我的錯題」的Carousel，包含個人答錯率最高的十題
         """
-        quiz_records_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.QUIZ_RECORD))
-        quiz_questions_df = pd.DataFrame(self.firebaseService.filter_data('quiz_questions', [('category', '==', category)]))
+        quiz_records_df = pd.DataFrame(self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_RECORD, [('user_id', '==', user_id)]))
+        quiz_questions_df = pd.DataFrame(self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_QUESTION, [('category', '==', category)]))
         
         # 判斷該類別是否有任何答題記錄（依據total_count欄位）
         if quiz_questions_df['total_count'].sum() == 0:
             return LineBotHelper.reply_message(event, [TextMessage(text='尚未有任何答題記錄！')])
         else:
-            # 篩選同個類別主題的題目
-            quiz_questions_df = quiz_questions_df[quiz_questions_df['category'] == category]
             # 為了避免兩個DataFrame欄位名稱重複，將quiz_questions的answer欄位改名為correct_answer
             quiz_questions_df = quiz_questions_df.rename(columns={'answer': 'correct_answer'})
             merged_df = pd.merge(quiz_records_df, quiz_questions_df, left_on='question_id', right_on='id', how='left')
 
-            # 選取user_id為user_id的資料（該使用者個人的答題資料）
-            user_records_df = merged_df[merged_df['user_id'] == user_id]
-
             # 判斷使用者是否有作答過任何題目（是否在quiz_records中有該使用者的答題記錄）
-            if user_records_df.empty:
+            if merged_df.empty:
                 return LineBotHelper.reply_message(event, [TextMessage(text='您尚未作答過任何題目！')])
             else:
                 # 新增is_correct欄位，判斷使用者的答案是否正確
-                user_records_df['is_correct'] = user_records_df.apply(
+                merged_df['is_correct'] = merged_df.apply(
                     lambda row: 1 if row['answer'].lower() == row['correct_answer'].lower() else 0, axis=1
                 )
 
                 # 計算每個題目的答題次數和答對次數
-                question_stats = user_records_df.groupby('question_id').agg(
+                question_stats = merged_df.groupby('question_id').agg(
                     total_attempts=('question_id', 'size'),
                     correct_attempts=('is_correct', 'sum')
                 ).reset_index()
@@ -566,7 +560,7 @@ class Quiz(Feature):
         生成完整測驗題目的Flex Message（包含答案）
         """
         # 只提取id == question_id的題目資料
-        quiz_question = self.firebaseService.filter_data('quiz_questions', [('id', '==', int(question_id) )])[0]
+        quiz_question = self.firebaseService.filter_data(DatabaseCollectionMap.QUIZ_QUESTION, [('id', '==', int(question_id))])[0]
 
         # 生成題目的Line Flex
         line_flex_str = self.firebaseService.get_data(

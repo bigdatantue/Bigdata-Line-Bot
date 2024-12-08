@@ -36,13 +36,13 @@ class Course(Feature):
             # 查詢修課進度
             user_id = event.source.user_id
 
-            user_detail = self.firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
+            user_detail = self.firebaseService.get_data(DatabaseCollectionMap.USER, user_id).get('details')
             # 確認使用者填完的資料是否已經認證
             if not user_detail or not user_detail['verification']:
                 return LineBotHelper.reply_message(event, [TextMessage(text='請先在圖文選單點擊【設定】中的【設定個人資料】填寫表單，並傳送學生證正面照片完成認證')])
 
             student_id = user_detail['studentId']
-            user_courses = self.firebaseService.filter_data('course_study_records', [('student_id', '==', student_id)])
+            user_courses = self.firebaseService.filter_data(DatabaseCollectionMap.COURSE_STUDY, [('student_id', '==', student_id)])
             # 取得課程資料
             courses_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE))
             courses_records_df = pd.DataFrame(self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE_OPEN))
