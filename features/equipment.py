@@ -76,7 +76,7 @@ class Equipment(Feature):
             ('type', '==', int(params.pop('equipmentId'))),
             ('status', '==', EquipmentStatus.AVAILABLE)
         ]
-        equipment_status_data = self.firebaseService.filter_data('equipments', conditions)
+        equipment_status_data = self.firebaseService.filter_data(DatabaseCollectionMap.EQUIPMENT, conditions)
         # 隨機產生id
         borrower_id = LineBotHelper.generate_id()
         params.update({
@@ -94,7 +94,7 @@ class Equipment(Feature):
         rent_amount = int(params.pop('equipmentAmount'))
         # 更新設備狀態
         for equipment in equipment_status_data[:rent_amount]:
-            self.firebaseService.update_data('equipments', equipment.get('_id'), params)
+            self.firebaseService.update_data(DatabaseCollectionMap.EQUIPMENT, equipment.get('_id'), params)
         return borrower_id
     
     def __get_borrow_records(self, user_id: str, borrower_id: str=None):
@@ -102,12 +102,12 @@ class Equipment(Feature):
         list: 借用紀錄
         """
         conditions = [('borrower', '==', user_id)]
-        equipments = self.firebaseService.filter_data('equipments', conditions)
+        equipments = self.firebaseService.filter_data(DatabaseCollectionMap.EQUIPMENT, conditions)
 
         if borrower_id:
             conditions.append(('borrowerId', '==', borrower_id))
 
-        equipments = self.firebaseService.filter_data('equipments', conditions)
+        equipments = self.firebaseService.filter_data(DatabaseCollectionMap.EQUIPMENT, conditions)
         borrow_records_dict = {}
         for equipment in equipments:
             # borrower_id_ 多一個底線是為了避免與參數名稱衝突

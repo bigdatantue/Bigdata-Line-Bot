@@ -91,7 +91,7 @@ def handle_unfollow(event):
     try:
         user_id = event.source.user_id
         # 使用者在資料庫中的isActive設定為False
-        firebaseService.update_data('users', user_id, {'isActive': False})
+        firebaseService.update_data(DatabaseCollectionMap.USER, user_id, {'isActive': False})
     except Exception as e:
         app.logger.error(e)
         error_message = ''.join(traceback.format_exception(None, e, e.__traceback__))

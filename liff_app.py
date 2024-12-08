@@ -39,8 +39,7 @@ def compact():
 def userinfo():
     liff_id = LIFFSize.TALL.value
     user_id = request.args.get('userId')
-    user_info = firebaseService.filter_data('users', [('userId', '==', user_id)])
-    user_info = user_info[0].get('details')
+    user_info = firebaseService.get_data(DatabaseCollectionMap.USER, user_id).get('details')
     return render_template('liff/userinfo.html', **locals())
 
 @liff_app.route('/userinfo', methods=['POST'])
@@ -48,7 +47,7 @@ def userinfo_post():
     try:
         data = request.form.to_dict()
         user_id = data.pop('userId')
-        user_info = firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
+        user_info = firebaseService.get_data(DatabaseCollectionMap.USER, user_id).get('details')
         if user_info:
             verification = user_info.pop('verification')
             verrfication_keys = ['identity', 'name', 'studentId', 'college', 'department', 'grade']
@@ -59,7 +58,7 @@ def userinfo_post():
             data.update({'verification': verification})
         else:
             data.update({'verification': False})
-        firebaseService.update_data('users', user_id, {'details': data})
+        firebaseService.update_data(DatabaseCollectionMap.USER, user_id, {'details': data})
 
         return jsonify({'success': True, 'message': '設定成功'})
     except Exception as e:
@@ -73,7 +72,7 @@ def userinfo_post():
 def rent():
     liff_id = LIFFSize.TALL.value
     user_id = request.args.get('userId')
-    user_info = firebaseService.filter_data('users', [('userId', '==', user_id)])[0].get('details')
+    user_info = firebaseService.get_data(DatabaseCollectionMap.USER, user_id).get('details')
 
     # 計算每種設備的可借數量
     equipments = []
@@ -83,7 +82,7 @@ def rent():
             ('type', '==', equipment_id),
             ('status', '==', EquipmentStatus.AVAILABLE)
         ]
-        equipment['available_amount'] = len(firebaseService.filter_data('equipments', conditions))
+        equipment['available_amount'] = len(firebaseService.filter_data(DatabaseCollectionMap.EQUIPMENT, conditions))
         equipment['equipment_id'] = equipment_id.value
         equipments.append(equipment)
 
@@ -97,7 +96,7 @@ def submit_rent():
     try:
         # 將處理過的 postback_data 存入 Firebase TEMP
         firebaseService.add_data(DatabaseCollectionMap.TEMP, user_id, data)
-        supervisors = [user.get('userId') for user in firebaseService.filter_data('users', [('permission', '>=', Permission.LEADER)])]
+        supervisors = [user.get('userId') for user in firebaseService.filter_data(DatabaseCollectionMap.USER, [('permission', '>=', Permission.LEADER)])]
         line_flex_template = firebaseService.get_data(
             DatabaseCollectionMap.LINE_FLEX,
             "equipment"

@@ -2,6 +2,8 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
+from google.cloud.firestore_v1 import query
+from google.cloud.firestore_v1 import aggregation
 import threading
 
 class FireBaseService:
@@ -22,16 +24,45 @@ class FireBaseService:
         doc = doc_ref.get()
         return doc.to_dict()
     
-    def filter_data(self, collection, conditions, order_by=None):
-        """篩選資料"""
+    def filter_data(self, collection, conditions, order_by=None, limit=None):
+        """篩選資料\n
+        conditions format:
+        [
+          ("field", "operator", "value"),
+          ...
+        ]
+        
+        Example: [("age", ">", 20)]
+
+        order_by format:
+        ("field", "direction")
+        direction: "asc" or "desc" (default: "asc")
+        Example: ("age", "desc")
+        """
         collection_ref = self.db.collection(collection)
         for condition in conditions:
             collection_ref = collection_ref.where(filter=FieldFilter(*condition))
         if order_by:
-            collection_ref = collection_ref.order_by(order_by)
+            field = order_by[0]
+            direction = query.Query.DESCENDING if order_by[1] == 'desc' else query.Query.ASCENDING
+            collection_ref = collection_ref.order_by(field, direction=direction)
+        if limit:
+            collection_ref = collection_ref.limit(limit)
         docs = collection_ref.stream()
         return [doc.to_dict() for doc in docs]
     
+    def get_aggregate_count(self, collection, conditions):
+        """
+        取得collection經過條件篩選後的總筆數
+        """
+        collection_ref = self.db.collection(collection)
+        for condition in conditions:
+            collection_ref = collection_ref.where(filter=FieldFilter(*condition))
+        aggregate_query = aggregation.AggregationQuery(collection_ref)
+        aggregate_query.count()
+        results = aggregate_query.get()
+
+        return results[0][0].value
     
     def add_data(self, collection, doc_id, data):
         """新增資料"""
