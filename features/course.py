@@ -103,7 +103,9 @@ class Course(Feature):
 
             # 如果有course_record_id，則回傳該課程的詳細資訊
             if course_record_id:
-                course = self.__get_course_records(id=int(course_record_id))[0]
+                course_record = self.firebaseService.filter_data(DatabaseCollectionMap.COURSE_OPEN, [('id', '==', int(course_record_id))])[0]
+                course = self.firebaseService.filter_data(DatabaseCollectionMap.COURSE, [('course_id', '==', course_record['course_id'])])[0]
+                course.update(course_record)
                 line_flex_template = self.firebaseService.get_data(
                     DatabaseCollectionMap.LINE_FLEX,
                     "course"
@@ -122,12 +124,15 @@ class Course(Feature):
                 # 拆解學年和學期
                 year = params.get('semester')[:3]
                 semester = params.get('semester')[3:]
-                courses = self.__get_course_records(year=year, semester=semester)
+                course_records = self.firebaseService.filter_data(DatabaseCollectionMap.COURSE_OPEN, [('year', '==', year), ('semester', '==', semester)])
+                for record in course_records:
+                    course = self.firebaseService.filter_data(DatabaseCollectionMap.COURSE, [('course_id', '==', record['course_id'])])[0]
+                    record.update(course)
                 if course_category != 'overview':
-                    courses = [course for course in courses if course.get('category') == course_map.get(course_category)]
-                if len(courses) == 0:
+                    course_records = [record for record in course_records if record.get('category') == course_map.get(course_category)]
+                if len(course_records) == 0:
                     message = f'{year}學年度第{semester}學期沒有{course_map.get(course_category)}課程資料'
-                    LineBotHelper.reply_message(event, [TextMessage(text=message)])
+                    return LineBotHelper.reply_message(event, [TextMessage(text=message)])
                 else:
                     line_flex_template = self.firebaseService.get_data(
                         DatabaseCollectionMap.LINE_FLEX, 
@@ -136,12 +141,12 @@ class Course(Feature):
 
                     bubble_amount = 12
                     flex_message_bubbles = []
-                    for i in range(math.ceil(len(courses) / bubble_amount)):
-                        temp = courses[i*bubble_amount:i*bubble_amount+bubble_amount] if i*bubble_amount+bubble_amount < len(courses) else courses[i*bubble_amount:]
+                    for i in range(math.ceil(len(course_records) / bubble_amount)):
+                        temp = course_records[i*bubble_amount:i*bubble_amount+bubble_amount] if i*bubble_amount+bubble_amount < len(course_records) else course_records[i*bubble_amount:]
                         line_flex_json = FlexMessageHelper.create_carousel_bubbles(temp, json.loads(line_flex_template))
                         line_flex_str = json.dumps(line_flex_json)
                         flex_message_bubbles.append(FlexContainer.from_json(line_flex_str))
-                return LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=flex) for flex in flex_message_bubbles])
+                    return LineBotHelper.reply_message(event, [FlexMessage(alt_text=course_map.get(course_category), contents=flex) for flex in flex_message_bubbles])
             
             # 否則回傳課程類別的快速回覆選項
             else:
@@ -152,25 +157,6 @@ class Course(Feature):
                 for i, text in enumerate(quick_reply_data.get('actions')):
                     quick_reply_data.get('actions')[i] = LineBotHelper.replace_variable(text, params)
                 return LineBotHelper.reply_message(event, [TextMessage(text=quick_reply_data.get('text'), quick_reply=QuickReplyHelper.create_quick_reply(quick_reply_data.get('actions')))])
-            
-    def __get_course_records(self, id=None, year=None, semester=None):
-        """Returns
-        list: 課程資料
-        """
-        courses = self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE)
-        course_records = self.firebaseService.get_collection_data(DatabaseCollectionMap.COURSE_OPEN)
-
-        courses_df = pd.DataFrame(courses)
-        course_records_df = pd.DataFrame(course_records)
-
-        # 將課程資料與課程紀錄資料合併
-        merged_data = pd.merge(courses_df, course_records_df, on='course_id', how='inner')
-        # 根據條件篩選資料
-        if id:
-            merged_data = merged_data[merged_data['id'] == id]
-        elif year and semester:
-            merged_data = merged_data[(merged_data['year'] == year) & (merged_data['semester'] == semester)]
-        return merged_data.to_dict(orient='records')
     
     def __get_study_status(self, row):
         """Returns
